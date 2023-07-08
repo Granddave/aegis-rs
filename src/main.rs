@@ -1,5 +1,6 @@
 extern crate serde_json;
 
+use aes_gcm::{aead::AeadMut, Aes256Gcm, KeyInit, Nonce};
 use base64::{engine::general_purpose, Engine as _};
 use hex::FromHex;
 use libreauth::oath::TOTPBuilder;
@@ -33,26 +34,79 @@ fn derive_key(password: &[u8], salt_hex: &str) -> Output {
     let derived_key = Scrypt
         .hash_password_customized(password, None, None, scrypt_params, &salt)
         .expect("Failed to derive key");
-    derived_key.hash.expect("Failed to get hash of derived key")
+
+    return derived_key.hash.expect("Failed to get hash of derived key");
 }
 
 fn main() {
     let filepath: Vec<String> = env::args().collect();
-    let aegis_json = parse_aegis_json(&filepath.get(1).expect("Found to filepath argument"));
+    let aegis_json = parse_aegis_json(filepath.get(1).expect("No filepath argument"));
 
-    let password = b"hunter42";
+    // TODO: Read password from stdin
+    let password = aegis_json["pw"].as_str().expect("No pw").as_bytes(); // TODO: Remove
 
-    let salt_string = aegis_json["header"]["slots"][1]["salt"]
+    // TODO: Try different slots
+    let slot = 1;
+    // Derive a key from the provided password and the salt from the file
+    let salt_string = aegis_json["header"]["slots"][slot]["salt"]
         .as_str()
         .expect("Failed to parse salt_string");
-
     let derived_key = derive_key(password, salt_string);
-    println!("{:?}", derived_key);
+    // println!(
+    //     "Derived key: {:?}, len={:?}",
+    //     derived_key,
+    //     derived_key.len()
+    // );
 
-    // TODO: Set up AESGCM
-    // TODO: Decrypt master key
-    // TODO: Base64-decode database
-    // TODO: Decrypt database
+    let mut cipher = Aes256Gcm::new(derived_key.as_bytes().into());
+
+    // Decrypt master key
+    let tag_str = aegis_json["header"]["slots"][slot]["key_params"]["tag"]
+        .as_str()
+        .expect("Failed to find the tag");
+    let nonce_str = aegis_json["header"]["slots"][slot]["key_params"]["nonce"]
+        .as_str()
+        .expect("Failed to find the nonce");
+    let encrypted_key_str = aegis_json["header"]["slots"][slot]["key"]
+        .as_str()
+        .expect("Failed to find the key");
+
+    let mut ciphertext: Vec<u8> = Vec::from_hex(encrypted_key_str).unwrap().to_vec();
+    ciphertext.extend_from_slice(Vec::from_hex(tag_str).unwrap().as_slice());
+    let master_key = cipher
+        .decrypt(
+            Nonce::from_slice(&Vec::from_hex(nonce_str).unwrap()),
+            ciphertext.as_ref(),
+        )
+        .expect("Failed to decrypt master key");
+
+    // Load and base64-decode database
+    let db_contents_enc_b64 = aegis_json["db"]
+        .as_str()
+        .expect("Failed to find the database");
+    let db_contents_enc = general_purpose::STANDARD_NO_PAD
+        .decode(db_contents_enc_b64)
+        .expect("Failed to decode the database");
+
+    // Decrypt database
+    let mut cipher_db = Aes256Gcm::new(master_key.as_slice().into());
+    let mut ciphertext_db: Vec<u8> = db_contents_enc;
+    ciphertext_db.extend_from_slice(Vec::from_hex(tag_str).unwrap().as_slice());
+    let db_contents_str = cipher_db
+        .decrypt(
+            Nonce::from_slice(&Vec::from_hex(nonce_str).unwrap()),
+            ciphertext_db.as_ref(),
+        )
+        .expect("Failed to decrypt database");
+
+    println!("{:?}", db_contents_str);
+
+    //
+    //
+    //
+    //
+    //
+    //
     // TODO: Parse out TOTP entry
 
     // TOTP Generation
