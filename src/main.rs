@@ -36,7 +36,13 @@ fn derive_key(password: &[u8], salt_hex: &str) -> Output {
         .hash_password_customized(password, None, None, scrypt_params, &salt)
         .expect("Failed to derive key");
 
-    return derived_key.hash.expect("Failed to get hash of derived key");
+    derived_key.hash.expect("Failed to get hash of derived key")
+}
+
+fn generate_totp(secret: &str) -> Result<String> {
+    let code = TOTPBuilder::new().base32_key(secret).finalize()?.generate();
+    assert_eq!(code.len(), 6);
+    Ok(code)
 }
 
 fn main() -> Result<()> {
@@ -50,77 +56,67 @@ fn main() -> Result<()> {
 
     // TODO: Try different slots
     let slot = 1;
+
     // Derive a key from the provided password and the salt from the file
     let salt_hex_str = aegis_json["header"]["slots"][slot]["salt"]
         .as_str()
         .expect("Failed to parse salt string");
     let derived_key = derive_key(password, salt_hex_str);
-    // println!(
-    //     "Derived key: {:?}, len={:?}",
-    //     derived_key,
-    //     derived_key.len()
-    // );
 
-    let mut cipher = Aes256Gcm::new(derived_key.as_bytes().into());
-
-    // Decrypt master key
-    let tag_hex = aegis_json["header"]["slots"][slot]["key_params"]["tag"]
+    let key_tag_hex = aegis_json["header"]["slots"][slot]["key_params"]["tag"]
         .as_str()
         .expect("Failed to find the tag");
-    let nonce_hex = aegis_json["header"]["slots"][slot]["key_params"]["nonce"]
-        .as_str()
-        .expect("Failed to find the nonce");
+    let key_nonce = Vec::from_hex(
+        aegis_json["header"]["slots"][slot]["key_params"]["nonce"]
+            .as_str()
+            .expect("Failed to find the nonce"),
+    )
+    .expect("Failed to parse key nonce hex");
     let master_key_enc_hex = aegis_json["header"]["slots"][slot]["key"]
         .as_str()
         .expect("Failed to find the key");
+    let mut master_key_enc: Vec<u8> = Vec::from_hex(master_key_enc_hex)?.to_vec();
+    master_key_enc.extend_from_slice(&Vec::from_hex(key_tag_hex)?);
 
-    let mut master_key_enc: Vec<u8> = Vec::from_hex(master_key_enc_hex).unwrap().to_vec();
-    master_key_enc.extend_from_slice(Vec::from_hex(tag_hex).unwrap().as_slice());
+    // Decrypt master key
+    let mut cipher = Aes256Gcm::new(derived_key.as_bytes().into());
     let master_key = cipher
-        .decrypt(
-            Nonce::from_slice(&Vec::from_hex(nonce_hex).unwrap()),
-            master_key_enc.as_ref(),
-        )
+        .decrypt(Nonce::from_slice(&key_nonce), master_key_enc.as_ref())
         .expect("Failed to decrypt master key");
 
-    // Load and base64-decode database
-    let db_contents_enc_b64 = aegis_json["db"]
+    // Get database encryption parameters
+    let db_tag_hex = aegis_json["header"]["params"]["tag"]
         .as_str()
-        .expect("Failed to find the database");
-    let db_contents_enc = general_purpose::STANDARD_NO_PAD
-        .decode(db_contents_enc_b64)
-        .expect("Failed to decode the database");
+        .expect("Failed to find the db tag");
+    let db_nonce = Vec::from_hex(
+        aegis_json["header"]["params"]["nonce"]
+            .as_str()
+            .expect("Failed to find the db nonce"),
+    )
+    .expect("Failed to parse db nonce hex");
+    let db_contents_enc = general_purpose::STANDARD_NO_PAD.decode(
+        aegis_json["db"]
+            .as_str()
+            .expect("Failed to find the database"),
+    )?;
 
     // Decrypt database
     let mut cipher_db = Aes256Gcm::new(master_key.as_slice().into());
-    let mut ciphertext_db: Vec<u8> = db_contents_enc;
-    ciphertext_db.extend_from_slice(Vec::from_hex(tag_hex).unwrap().as_slice());
-    let db_contents_str = cipher_db
-        .decrypt(
-            Nonce::from_slice(&Vec::from_hex(nonce_hex).unwrap()),
-            ciphertext_db.as_ref(),
-        )
+    let mut db_enc: Vec<u8> = db_contents_enc;
+    db_enc.extend_from_slice(&Vec::from_hex(db_tag_hex)?);
+    let db_contents = cipher_db
+        .decrypt(Nonce::from_slice(&db_nonce), db_enc.as_ref())
         .expect("Failed to decrypt database");
-
-    println!("{:?}", db_contents_str);
-
-    //
-    //
-    //
-    //
-    //
-    //
-    // TODO: Parse out TOTP entry
+    let db_contents_str = String::from_utf8(db_contents).expect("UTF8");
+    let db_json: Value = serde_json::from_str(&db_contents_str).expect("Failed to parse JSON");
 
     // TOTP Generation
-    let key = "ABCABCABCABC".to_string();
-    let code = TOTPBuilder::new()
-        .base32_key(&key)
-        .finalize()
-        .unwrap()
-        .generate();
-    assert_eq!(code.len(), 6);
+    // TODO: Add TOTP picker
+    let secret = db_json["entries"][0]["info"]["secret"].as_str().unwrap();
+    let code = generate_totp(secret)?;
+
     println!("{}", code);
+    // TODO: Print time left
 
     Ok(())
 }
