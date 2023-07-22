@@ -11,9 +11,12 @@ use scrypt::{
     Scrypt,
 };
 use serde_json::Value;
-use std::env;
 use std::fs::File;
 use std::io::Read;
+use std::{
+    env,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 fn parse_aegis_json(path: &str) -> Value {
     let mut file = File::open(path).expect("Failed to open file");
@@ -43,6 +46,17 @@ fn generate_totp(secret: &str) -> Result<String> {
     let code = TOTPBuilder::new().base32_key(secret).finalize()?.generate();
     assert_eq!(code.len(), 6);
     Ok(code)
+}
+
+fn get_time_left(period: i32) -> i32 {
+    let current_time = SystemTime::now();
+    let seconds_since_epoch = current_time
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    let seconds = seconds_since_epoch.as_secs() as i32;
+    let remaining_time = period - (seconds % period);
+
+    remaining_time
 }
 
 fn main() -> Result<()> {
@@ -115,7 +129,7 @@ fn main() -> Result<()> {
     let secret = db_json["entries"][0]["info"]["secret"].as_str().unwrap();
     let code = generate_totp(secret)?;
 
-    println!("{}", code);
+    println!("{}, ({}s left)", code, get_time_left(30));
     // TODO: Print time left
 
     Ok(())
