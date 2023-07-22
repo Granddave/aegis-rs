@@ -39,8 +39,8 @@ fn derive_key(password: &[u8], salt_hex: &str) -> Output {
 }
 
 fn main() {
-    let filepath: Vec<String> = env::args().collect();
-    let aegis_json = parse_aegis_json(filepath.get(1).expect("No filepath argument"));
+    let args: Vec<String> = env::args().collect();
+    let aegis_json = parse_aegis_json(args.get(1).expect("No filepath argument"));
 
     // TODO: Read password from stdin
     let password = aegis_json["pw"].as_str().expect("No pw").as_bytes(); // TODO: Remove
@@ -48,10 +48,10 @@ fn main() {
     // TODO: Try different slots
     let slot = 1;
     // Derive a key from the provided password and the salt from the file
-    let salt_string = aegis_json["header"]["slots"][slot]["salt"]
+    let salt_hex_str = aegis_json["header"]["slots"][slot]["salt"]
         .as_str()
-        .expect("Failed to parse salt_string");
-    let derived_key = derive_key(password, salt_string);
+        .expect("Failed to parse salt string");
+    let derived_key = derive_key(password, salt_hex_str);
     // println!(
     //     "Derived key: {:?}, len={:?}",
     //     derived_key,
@@ -61,22 +61,22 @@ fn main() {
     let mut cipher = Aes256Gcm::new(derived_key.as_bytes().into());
 
     // Decrypt master key
-    let tag_str = aegis_json["header"]["slots"][slot]["key_params"]["tag"]
+    let tag_hex = aegis_json["header"]["slots"][slot]["key_params"]["tag"]
         .as_str()
         .expect("Failed to find the tag");
-    let nonce_str = aegis_json["header"]["slots"][slot]["key_params"]["nonce"]
+    let nonce_hex = aegis_json["header"]["slots"][slot]["key_params"]["nonce"]
         .as_str()
         .expect("Failed to find the nonce");
-    let encrypted_key_str = aegis_json["header"]["slots"][slot]["key"]
+    let master_key_enc_hex = aegis_json["header"]["slots"][slot]["key"]
         .as_str()
         .expect("Failed to find the key");
 
-    let mut ciphertext: Vec<u8> = Vec::from_hex(encrypted_key_str).unwrap().to_vec();
-    ciphertext.extend_from_slice(Vec::from_hex(tag_str).unwrap().as_slice());
+    let mut master_key_enc: Vec<u8> = Vec::from_hex(master_key_enc_hex).unwrap().to_vec();
+    master_key_enc.extend_from_slice(Vec::from_hex(tag_hex).unwrap().as_slice());
     let master_key = cipher
         .decrypt(
-            Nonce::from_slice(&Vec::from_hex(nonce_str).unwrap()),
-            ciphertext.as_ref(),
+            Nonce::from_slice(&Vec::from_hex(nonce_hex).unwrap()),
+            master_key_enc.as_ref(),
         )
         .expect("Failed to decrypt master key");
 
@@ -91,10 +91,10 @@ fn main() {
     // Decrypt database
     let mut cipher_db = Aes256Gcm::new(master_key.as_slice().into());
     let mut ciphertext_db: Vec<u8> = db_contents_enc;
-    ciphertext_db.extend_from_slice(Vec::from_hex(tag_str).unwrap().as_slice());
+    ciphertext_db.extend_from_slice(Vec::from_hex(tag_hex).unwrap().as_slice());
     let db_contents_str = cipher_db
         .decrypt(
-            Nonce::from_slice(&Vec::from_hex(nonce_str).unwrap()),
+            Nonce::from_slice(&Vec::from_hex(nonce_hex).unwrap()),
             ciphertext_db.as_ref(),
         )
         .expect("Failed to decrypt database");
