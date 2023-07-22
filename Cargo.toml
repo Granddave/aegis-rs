@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 aes-gcm = "0.10.2"
 base64 = "0.21.2"
+color-eyre = "0.6"
 hex = "0.4.3"
 libreauth = "0.16.0"
 password-hash = "0.5.0"

@@ -2,6 +2,7 @@ extern crate serde_json;
 
 use aes_gcm::{aead::AeadMut, Aes256Gcm, KeyInit, Nonce};
 use base64::{engine::general_purpose, Engine as _};
+use color_eyre::eyre::Result;
 use hex::FromHex;
 use libreauth::oath::TOTPBuilder;
 use password_hash::Output;
@@ -38,7 +39,9 @@ fn derive_key(password: &[u8], salt_hex: &str) -> Output {
     return derived_key.hash.expect("Failed to get hash of derived key");
 }
 
-fn main() {
+fn main() -> Result<()> {
+    color_eyre::install()?;
+
     let args: Vec<String> = env::args().collect();
     let aegis_json = parse_aegis_json(args.get(1).expect("No filepath argument"));
 
@@ -118,4 +121,6 @@ fn main() {
         .generate();
     assert_eq!(code.len(), 6);
     println!("{}", code);
+
+    Ok(())
 }
