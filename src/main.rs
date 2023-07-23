@@ -125,77 +125,96 @@ fn get_time_left(period: i32) -> i32 {
     remaining_time
 }
 
+fn decrypt_master_key(password: &str, slots: &Vec<Slot>) -> Option<Vec<u8>> {
+    for slot in slots
+        .iter()
+        .filter(|s| s.r#type == 1)
+        .collect::<Vec<&Slot>>()
+    {
+        // Derive a key from the provided password and the salt from the file
+        let derived_key = derive_key(
+            password.as_bytes(),
+            slot.salt.as_ref().expect("Failed to parse salt string"),
+        );
+        let key_nonce = Vec::from_hex(&slot.key_params.nonce).expect("Unexpected nonce format");
+        let mut master_key_cipher = Vec::from_hex(&slot.key)
+            .expect("Unexpected key format")
+            .to_vec();
+        master_key_cipher.extend_from_slice(
+            &Vec::from_hex(&slot.key_params.tag).expect("Unexpected tag format"),
+        );
+
+        // Decrypt master key
+        let mut cipher = Aes256Gcm::new(derived_key.as_bytes().into());
+        let master_key = cipher
+            .decrypt(Nonce::from_slice(&key_nonce), master_key_cipher.as_ref())
+            .expect("Failed to decrypt master key");
+
+        return Some(master_key);
+    }
+
+    None
+}
+
+fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Database {
+    let db_nonce = Vec::from_hex(&params.nonce).expect("Unexpected nonce format");
+    let db_tag = Vec::from_hex(&params.tag).expect("Unexpected tag format");
+    let db_contents_cipher = general_purpose::STANDARD_NO_PAD
+        .decode(db)
+        .expect("Unexpected database format");
+
+    // Decrypt database
+    let mut cipher_db = Aes256Gcm::new(master_key.as_slice().into());
+    let mut db_cipher: Vec<u8> = db_contents_cipher;
+    db_cipher.extend_from_slice(&db_tag);
+    let db_contents = cipher_db
+        .decrypt(Nonce::from_slice(&db_nonce), db_cipher.as_ref())
+        .expect("Failed to decrypt database");
+
+    let db_contents_str = String::from_utf8(db_contents).expect("Unexpected UTF-8 format");
+    let db: Database = serde_json::from_str(&db_contents_str).expect("Failed to parse JSON");
+
+    db
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
 
     let args: Vec<String> = env::args().collect();
     let aegis = parse_aegis_json(args.get(1).expect("No filepath argument"));
 
-    // TODO: Remove
-    //let password = aegis_json["pw"].as_str().expect("No pw");
     let password = Password::with_theme(&ColorfulTheme::default())
         .with_prompt("Insert Aegis Password")
         .interact()?;
     // TODO: Support password file
 
-    // TODO: Try different slots.
-    //       Find the ones with type == 1
-    //       Iterate over them and decrypt the master key
-    let slot_index = 1;
-    let slot = aegis.header.slots.get(slot_index).unwrap();
-
-    // Derive a key from the provided password and the salt from the file
-    let derived_key = derive_key(
-        password.as_bytes(),
-        slot.salt.as_ref().expect("Failed to parse salt string"),
-    );
-    let key_nonce = Vec::from_hex(&slot.key_params.nonce)?;
-    let mut master_key_enc: Vec<u8> = Vec::from_hex(&slot.key)?.to_vec();
-    master_key_enc.extend_from_slice(&Vec::from_hex(&slot.key_params.tag)?);
-
-    // Decrypt master key
-    let mut cipher = Aes256Gcm::new(derived_key.as_bytes().into());
-    let master_key = cipher
-        .decrypt(Nonce::from_slice(&key_nonce), master_key_enc.as_ref())
+    let master_key = decrypt_master_key(password.as_str(), &aegis.header.slots)
         .expect("Failed to decrypt master key");
-
-    // Get database encryption parameters
-    let db_tag = Vec::from_hex(aegis.header.params.tag)?;
-    let db_nonce = Vec::from_hex(aegis.header.params.nonce)?;
-    let db_contents_enc = general_purpose::STANDARD_NO_PAD.decode(aegis.db)?;
-
-    // Decrypt database
-    let mut cipher_db = Aes256Gcm::new(master_key.as_slice().into());
-    let mut db_enc: Vec<u8> = db_contents_enc;
-    db_enc.extend_from_slice(&db_tag);
-    let db_contents = cipher_db
-        .decrypt(Nonce::from_slice(&db_nonce), db_enc.as_ref())
-        .expect("Failed to decrypt database");
-
-    let db_contents_str = String::from_utf8(db_contents).expect("UTF8");
-    let db: Database = serde_json::from_str(&db_contents_str).expect("Failed to parse JSON");
+    let db = decrypt_database(&aegis.header.params, &master_key, &aegis.db);
 
     // TOTP Picker
-    let items: Vec<&str> = db
+    let items: Vec<String> = db
         .entries
         .iter()
-        .map(|entry| entry.issuer.as_str()) // TODO: Insert padded account name
+        .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim())) // TODO: Insert padded account name
         .collect();
 
     let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
         .items(&items)
         .default(0)
-        .interact_on_opt(&Term::stderr())?;
+        .interact_opt()?;
     match selection {
         Some(index) => {
             let totp_info = &db.entries.get(index).unwrap().info;
             println!(
                 "{}, ({}s left)",
                 generate_totp(&totp_info.secret.as_str())?,
-                get_time_left(30)
+                get_time_left(totp_info.period)
             );
         }
-        None => println!("No selection"),
+        None => {
+            println!("No selection");
+        }
     }
     // TODO: Reset terminal on exit
 
