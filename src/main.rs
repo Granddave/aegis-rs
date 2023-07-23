@@ -3,6 +3,8 @@ extern crate serde_json;
 use aes_gcm::{aead::AeadMut, Aes256Gcm, KeyInit, Nonce};
 use base64::{engine::general_purpose, Engine as _};
 use color_eyre::eyre::Result;
+use console::Term;
+use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
 use hex::FromHex;
 use libreauth::oath::TOTPBuilder;
 use password_hash::Output;
@@ -10,6 +12,7 @@ use scrypt::{
     password_hash::{PasswordHasher, SaltString},
     Scrypt,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
@@ -17,6 +20,34 @@ use std::{
     env,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+#[derive(Debug, Deserialize, Serialize)]
+struct EntryInfo {
+    secret: String,
+    algo: String,
+    digits: i32,
+    period: i32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Entry {
+    // #[serde(rename = "type")]
+    // type_: String,
+    // uuid: String,
+    name: String,
+    issuer: String,
+    // note: String,
+    // favorite: bool,
+    // #[serde(skip)]
+    // icon: String,
+    info: EntryInfo,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Database {
+    version: u32,
+    entries: Vec<Entry>,
+}
 
 fn parse_aegis_json(path: &str) -> Value {
     let mut file = File::open(path).expect("Failed to open file");
@@ -65,8 +96,12 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let aegis_json = parse_aegis_json(args.get(1).expect("No filepath argument"));
 
-    // TODO: Read password from stdin
-    let password = aegis_json["pw"].as_str().expect("No pw").as_bytes(); // TODO: Remove
+    // TODO: Remove
+    //let password = aegis_json["pw"].as_str().expect("No pw");
+    let password = Password::with_theme(&ColorfulTheme::default())
+        .with_prompt("Insert Aegis Password")
+        .interact()?;
+    // TODO: Support password file
 
     // TODO: Try different slots
     let slot = 1;
@@ -75,7 +110,7 @@ fn main() -> Result<()> {
     let salt_hex_str = aegis_json["header"]["slots"][slot]["salt"]
         .as_str()
         .expect("Failed to parse salt string");
-    let derived_key = derive_key(password, salt_hex_str);
+    let derived_key = derive_key(password.as_bytes(), salt_hex_str);
 
     let key_tag_hex = aegis_json["header"]["slots"][slot]["key_params"]["tag"]
         .as_str()
@@ -122,15 +157,31 @@ fn main() -> Result<()> {
         .decrypt(Nonce::from_slice(&db_nonce), db_enc.as_ref())
         .expect("Failed to decrypt database");
     let db_contents_str = String::from_utf8(db_contents).expect("UTF8");
-    let db_json: Value = serde_json::from_str(&db_contents_str).expect("Failed to parse JSON");
+    let db: Database = serde_json::from_str(&db_contents_str).expect("Failed to parse JSON");
 
-    // TOTP Generation
-    // TODO: Add TOTP picker
-    let secret = db_json["entries"][0]["info"]["secret"].as_str().unwrap();
-    let code = generate_totp(secret)?;
+    // TOTP Picker
+    let items: Vec<&str> = db
+        .entries
+        .iter()
+        .map(|entry| entry.issuer.as_str()) // TODO: Insert padded account name
+        .collect();
 
-    println!("{}, ({}s left)", code, get_time_left(30));
-    // TODO: Print time left
+    let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
+        .items(&items)
+        .default(0)
+        .interact_on_opt(&Term::stderr())?;
+    match selection {
+        Some(index) => {
+            let totp_info = &db.entries.get(index).unwrap().info;
+            println!(
+                "{}, ({}s left)",
+                generate_totp(&totp_info.secret.as_str())?,
+                get_time_left(30)
+            );
+        }
+        None => println!("No selection"),
+    }
+    // TODO: Reset terminal on exit
 
     Ok(())
 }
