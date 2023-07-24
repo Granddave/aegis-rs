@@ -43,7 +43,7 @@ struct Entry {
 
 #[derive(Debug, Deserialize)]
 struct Database {
-    version: u32, // TODO: Check version
+    version: u32,
     entries: Vec<Entry>,
 }
 
@@ -75,7 +75,7 @@ struct Header {
 
 #[derive(Debug, Deserialize)]
 struct AegisBackup {
-    version: u32, // TODO: Check version
+    version: u32,
     header: Header,
     db: String,
 }
@@ -88,17 +88,16 @@ fn parse_aegis_json(path: &str) -> AegisBackup {
     serde_json::from_str(&contents).expect("Failed to parse JSON")
 }
 
-fn derive_key(password: &[u8], salt_hex: &str) -> Output {
+fn derive_key(password: &[u8], slot: &Slot) -> Output {
     let salt = SaltString::from_b64(
         &general_purpose::STANDARD_NO_PAD
-            .encode(Vec::from_hex(salt_hex).expect("Failed to decode hex")),
+            .encode(Vec::from_hex(&slot.salt.as_ref().unwrap()).expect("Failed to decode hex")),
     )
     .expect("Failed to parse salt");
 
-    // TODO: Parse parameters from JSON
-    let n = 15;
-    let r = 8;
-    let p = 1;
+    let n = (slot.n.unwrap() as f32).log2() as u8;
+    let r = slot.r.unwrap() as u32;
+    let p = slot.p.unwrap() as u32;
 
     let scrypt_params = scrypt::Params::new(n, r, p, 32).expect("Failed to set scrypt params");
     let derived_key = Scrypt
@@ -132,10 +131,7 @@ fn decrypt_master_key(password: &str, slots: &Vec<Slot>) -> Option<Vec<u8>> {
         .collect::<Vec<&Slot>>()
     {
         // Derive a key from the provided password and the salt from the file
-        let derived_key = derive_key(
-            password.as_bytes(),
-            slot.salt.as_ref().expect("Failed to parse salt string"),
-        );
+        let derived_key = derive_key(password.as_bytes(), &slot);
         let key_nonce = Vec::from_hex(&slot.key_params.nonce).expect("Unexpected nonce format");
         let mut master_key_cipher = Vec::from_hex(&slot.key)
             .expect("Unexpected key format")
@@ -149,6 +145,7 @@ fn decrypt_master_key(password: &str, slots: &Vec<Slot>) -> Option<Vec<u8>> {
         let master_key = cipher
             .decrypt(Nonce::from_slice(&key_nonce), master_key_cipher.as_ref())
             .expect("Failed to decrypt master key");
+        // TODO: Don't crash
 
         return Some(master_key);
     }
@@ -183,6 +180,11 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let aegis = parse_aegis_json(args.get(1).expect("No filepath argument"));
 
+    if aegis.version != 1 {
+        println!("Unsupported vault version: {}", aegis.version);
+        std::process::exit(1);
+    }
+
     let password = Password::with_theme(&ColorfulTheme::default())
         .with_prompt("Insert Aegis Password")
         .interact()?;
@@ -191,6 +193,11 @@ fn main() -> Result<()> {
     let master_key = decrypt_master_key(password.as_str(), &aegis.header.slots)
         .expect("Failed to decrypt master key");
     let db = decrypt_database(&aegis.header.params, &master_key, &aegis.db);
+
+    if db.version != 2 {
+        println!("Unsupported database version: {}", db.version);
+        std::process::exit(1);
+    }
 
     // TOTP Picker
     let items: Vec<String> = db
