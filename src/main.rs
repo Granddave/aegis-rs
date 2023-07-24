@@ -3,7 +3,6 @@ extern crate serde_json;
 use aes_gcm::{aead::AeadMut, Aes256Gcm, KeyInit, Nonce};
 use base64::{engine::general_purpose, Engine as _};
 use color_eyre::eyre::Result;
-use console::Term;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
 use hex::FromHex;
 use libreauth::oath::TOTPBuilder;
@@ -13,6 +12,7 @@ use scrypt::{
     Scrypt,
 };
 use serde::Deserialize;
+use serde_repr::Deserialize_repr;
 use std::fs::File;
 use std::io::Read;
 use std::{
@@ -53,9 +53,17 @@ struct KeyParams {
     tag: String,
 }
 
+#[derive(Debug, Deserialize_repr, PartialEq)]
+#[repr(u8)]
+enum SlotType {
+    Raw = 0,
+    Password = 1,
+    Biometric = 2,
+}
+
 #[derive(Debug, Deserialize)]
 struct Slot {
-    r#type: i32,
+    r#type: SlotType,
     uuid: String,
     key: String,
     key_params: KeyParams,
@@ -127,7 +135,7 @@ fn get_time_left(period: i32) -> i32 {
 fn decrypt_master_key(password: &str, slots: &Vec<Slot>) -> Option<Vec<u8>> {
     for slot in slots
         .iter()
-        .filter(|s| s.r#type == 1)
+        .filter(|s| s.r#type == SlotType::Password)
         .collect::<Vec<&Slot>>()
     {
         // Derive a key from the provided password and the salt from the file
@@ -160,7 +168,6 @@ fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Da
         .decode(db)
         .expect("Unexpected database format");
 
-    // Decrypt database
     let mut cipher_db = Aes256Gcm::new(master_key.as_slice().into());
     let mut db_cipher: Vec<u8> = db_contents_cipher;
     db_cipher.extend_from_slice(&db_tag);
@@ -203,7 +210,7 @@ fn main() -> Result<()> {
     let items: Vec<String> = db
         .entries
         .iter()
-        .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim())) // TODO: Insert padded account name
+        .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
         .collect();
 
     let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
