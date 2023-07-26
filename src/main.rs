@@ -190,7 +190,7 @@ fn decrypt_master_key(password: &str, slots: &Vec<Slot>) -> Option<Vec<u8>> {
 fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Database {
     let db_nonce = Vec::from_hex(&params.nonce).expect("Unexpected nonce format");
     let db_tag = Vec::from_hex(&params.tag).expect("Unexpected tag format");
-    let db_contents_cipher = general_purpose::STANDARD_NO_PAD
+    let db_contents_cipher = general_purpose::STANDARD
         .decode(db)
         .expect("Unexpected database format");
 
