@@ -25,4 +25,9 @@ This is a CLI tool for generating TOTP codes from a backup vault from [Aegis Aut
 - Add countdown timer and refresh TOTP code after timeout
 - Improve on error handling
 - Support different TOTP algorithms
+    - [x] TOTP
+    - [ ] HOTP
+    - [ ] Steam
+    - [ ] Yandex
 - Support unencrypted vaults
+- Display digits in groups
