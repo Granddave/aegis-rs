@@ -5,7 +5,7 @@ use base64::{engine::general_purpose, Engine as _};
 use color_eyre::eyre::Result;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
 use hex::FromHex;
-use libreauth::oath::TOTPBuilder;
+use libreauth::{hash::HashFunction, oath::TOTPBuilder};
 use password_hash::Output;
 use scrypt::{
     password_hash::{PasswordHasher, SaltString},
@@ -21,16 +21,33 @@ use std::{
 };
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+enum HashAlgorithm {
+    Sha1,
+    Sha256,
+    Sha512,
+}
+
+#[derive(Debug, Deserialize)]
 struct EntryInfo {
     secret: String,
-    algo: String,
+    algo: HashAlgorithm,
     digits: i32,
     period: i32,
 }
 
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum EntryTypes {
+    Hotp,
+    Totp,
+    Steam,
+    Yandex,
+}
+
 #[derive(Debug, Deserialize)]
 struct Entry {
-    r#type: String,
+    r#type: EntryTypes,
     uuid: String,
     name: String,
     issuer: String,
@@ -115,9 +132,18 @@ fn derive_key(password: &[u8], slot: &Slot) -> Output {
     derived_key.hash.expect("Failed to get hash of derived key")
 }
 
-fn generate_totp(secret: &str) -> Result<String> {
-    let code = TOTPBuilder::new().base32_key(secret).finalize()?.generate();
-    assert_eq!(code.len(), 6);
+fn generate_totp(info: &EntryInfo) -> Result<String> {
+    let code = TOTPBuilder::new()
+        .base32_key(&info.secret.to_string())
+        .hash_function(match info.algo {
+            HashAlgorithm::Sha1 => HashFunction::Sha1,
+            HashAlgorithm::Sha256 => HashFunction::Sha256,
+            HashAlgorithm::Sha512 => HashFunction::Sha512,
+        })
+        .output_len(info.digits.try_into()?)
+        .period(info.period.try_into()?)
+        .finalize()?
+        .generate();
     Ok(code)
 }
 
@@ -206,31 +232,37 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    // TOTP Picker
-    let items: Vec<String> = db
+    let entries: Vec<&Entry> = db
         .entries
         .iter()
-        .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
+        .filter(|e| e.r#type == EntryTypes::Totp)
         .collect();
-
-    let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
-        .items(&items)
-        .default(0)
-        .interact_opt()?;
-    match selection {
-        Some(index) => {
-            let totp_info = &db.entries.get(index).unwrap().info;
-            println!(
-                "{}, ({}s left)",
-                generate_totp(&totp_info.secret.as_str())?,
-                get_time_left(totp_info.period)
-            );
+    if entries.is_empty() {
+        println!("Found no entries of the supported entry types (TOTP)");
+    } else {
+        let items: Vec<String> = entries
+            .iter()
+            .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
+            .collect();
+        let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
+            .items(&items)
+            .default(0)
+            .interact_opt()?;
+        match selection {
+            Some(index) => {
+                let totp_info = &db.entries.get(index).unwrap().info;
+                println!(
+                    "{}, ({}s left)",
+                    generate_totp(&totp_info)?,
+                    get_time_left(totp_info.period)
+                );
+            }
+            None => {
+                println!("No selection");
+            }
         }
-        None => {
-            println!("No selection");
-        }
+        // TODO: Reset terminal on exit
     }
-    // TODO: Reset terminal on exit
 
     Ok(())
 }
