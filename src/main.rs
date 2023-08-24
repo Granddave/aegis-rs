@@ -13,12 +13,13 @@ use scrypt::{
 };
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
-use std::fs::File;
 use std::io::Read;
 use std::{
-    env,
+    env, fs,
+    path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use std::{fs::File, io};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -113,6 +114,21 @@ fn parse_aegis_json(path: &str) -> AegisBackup {
     serde_json::from_str(&contents).expect("Failed to parse JSON")
 }
 
+fn get_password() -> io::Result<String> {
+    let home = env::var("HOME").expect("Failed to expand $HOME");
+    let password_filepath = PathBuf::from(home).join(".config/aegis-pass.txt");
+
+    if fs::metadata(&password_filepath).is_ok() {
+        println!("Found password file");
+        let password = fs::read_to_string(&password_filepath)?;
+        return Ok(password.trim().to_string());
+    } else {
+        return Password::with_theme(&ColorfulTheme::default())
+            .with_prompt("Insert Aegis Password")
+            .interact();
+    }
+}
+
 fn derive_key(password: &[u8], slot: &Slot) -> Output {
     let salt = SaltString::from_b64(
         &general_purpose::STANDARD_NO_PAD
@@ -176,12 +192,12 @@ fn decrypt_master_key(password: &str, slots: &Vec<Slot>) -> Option<Vec<u8>> {
 
         // Decrypt master key
         let mut cipher = Aes256Gcm::new(derived_key.as_bytes().into());
-        let master_key = cipher
-            .decrypt(Nonce::from_slice(&key_nonce), master_key_cipher.as_ref())
-            .expect("Failed to decrypt master key");
-        // TODO: Don't crash
-
-        return Some(master_key);
+        match cipher.decrypt(Nonce::from_slice(&key_nonce), master_key_cipher.as_ref()) {
+            Ok(master_key) => {
+                return Some(master_key);
+            }
+            Err(_) => continue,
+        };
     }
 
     None
@@ -218,13 +234,14 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    let password = Password::with_theme(&ColorfulTheme::default())
-        .with_prompt("Insert Aegis Password")
-        .interact()?;
-    // TODO: Support password file
-
-    let master_key = decrypt_master_key(password.as_str(), &aegis.header.slots)
-        .expect("Failed to decrypt master key");
+    let password = get_password()?;
+    let master_key = match decrypt_master_key(password.as_str(), &aegis.header.slots) {
+        Some(master_key) => master_key,
+        None => {
+            println!("Wrong password, try again.");
+            std::process::exit(1);
+        }
+    };
     let db = decrypt_database(&aegis.header.params, &master_key, &aegis.db);
 
     if db.version != 2 {
