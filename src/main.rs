@@ -49,12 +49,11 @@ enum EntryTypes {
 #[derive(Debug, Deserialize)]
 struct Entry {
     r#type: EntryTypes,
-    uuid: String,
+    // uuid: String,
     name: String,
     issuer: String,
-    note: String,
-    favorite: bool,
-    // #[serde(skip)]
+    // note: String,
+    // favorite: bool,
     // icon: String,
     info: EntryInfo,
 }
@@ -82,15 +81,15 @@ enum SlotType {
 #[derive(Debug, Deserialize)]
 struct Slot {
     r#type: SlotType,
-    uuid: String,
+    // uuid: String,
     key: String,
     key_params: KeyParams,
     n: Option<i32>,
     r: Option<i32>,
     p: Option<i32>,
     salt: Option<String>,
-    repaired: Option<bool>,
-    is_backup: Option<bool>,
+    // repaired: Option<bool>,
+    // is_backup: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -132,7 +131,7 @@ fn get_password() -> io::Result<String> {
 fn derive_key(password: &[u8], slot: &Slot) -> Output {
     let salt = SaltString::from_b64(
         &general_purpose::STANDARD_NO_PAD
-            .encode(Vec::from_hex(&slot.salt.as_ref().unwrap()).expect("Failed to decode hex")),
+            .encode(Vec::from_hex(slot.salt.as_ref().unwrap()).expect("Failed to decode hex")),
     )
     .expect("Failed to parse salt");
 
@@ -163,25 +162,24 @@ fn generate_totp(info: &EntryInfo) -> Result<String> {
     Ok(code)
 }
 
-fn get_time_left(period: i32) -> i32 {
+fn calculate_remaining_time(period_length_s: i32) -> i32 {
     let current_time = SystemTime::now();
     let seconds_since_epoch = current_time
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
     let seconds = seconds_since_epoch.as_secs() as i32;
-    let remaining_time = period - (seconds % period);
 
-    remaining_time
+    period_length_s - (seconds % period_length_s)
 }
 
-fn decrypt_master_key(password: &str, slots: &Vec<Slot>) -> Option<Vec<u8>> {
+fn decrypt_master_key(password: &str, slots: &[Slot]) -> Option<Vec<u8>> {
     for slot in slots
         .iter()
         .filter(|s| s.r#type == SlotType::Password)
         .collect::<Vec<&Slot>>()
     {
         // Derive a key from the provided password and the salt from the file
-        let derived_key = derive_key(password.as_bytes(), &slot);
+        let derived_key = derive_key(password.as_bytes(), slot);
         let key_nonce = Vec::from_hex(&slot.key_params.nonce).expect("Unexpected nonce format");
         let mut master_key_cipher = Vec::from_hex(&slot.key)
             .expect("Unexpected key format")
@@ -270,8 +268,8 @@ fn main() -> Result<()> {
                 let totp_info = &db.entries.get(index).unwrap().info;
                 println!(
                     "{}, ({}s left)",
-                    generate_totp(&totp_info)?,
-                    get_time_left(totp_info.period)
+                    generate_totp(totp_info)?,
+                    calculate_remaining_time(totp_info.period)
                 );
             }
             None => {
