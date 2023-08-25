@@ -225,7 +225,14 @@ fn main() -> Result<()> {
     color_eyre::install()?;
 
     let args: Vec<String> = env::args().collect();
-    let aegis = parse_aegis_json(args.get(1).expect("No filepath argument"));
+    let filepath = match args.get(1) {
+        Some(fp) => fp,
+        None => {
+            println!("No filepath argument");
+            std::process::exit(1);
+        }
+    };
+    let aegis = parse_aegis_json(filepath);
 
     if aegis.version != 1 {
         println!("Unsupported vault version: {}", aegis.version);
