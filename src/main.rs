@@ -105,7 +105,8 @@ struct AegisBackup {
     db: String,
 }
 
-fn parse_aegis_json(path: &str) -> AegisBackup {
+}
+fn parse_aegis_backup_file(path: &str) -> AegisBackup {
     let mut file = File::open(path).expect("Failed to open file");
     let mut contents = String::new();
     file.read_to_string(&mut contents)
@@ -232,22 +233,22 @@ fn main() -> Result<()> {
             std::process::exit(1);
         }
     };
-    let aegis = parse_aegis_json(filepath);
+    let aegis_backup = parse_aegis_backup_file(filepath);
 
-    if aegis.version != 1 {
-        println!("Unsupported vault version: {}", aegis.version);
+    if aegis_backup.version != 1 {
+        println!("Unsupported vault version: {}", aegis_backup.version);
         std::process::exit(1);
     }
 
     let password = get_password()?;
-    let master_key = match decrypt_master_key(password.as_str(), &aegis.header.slots) {
+    let master_key = match decrypt_master_key(password.as_str(), &aegis_backup.header.slots) {
         Some(master_key) => master_key,
         None => {
             println!("Wrong password, try again.");
             std::process::exit(1);
         }
     };
-    let db = decrypt_database(&aegis.header.params, &master_key, &aegis.db);
+    let db = decrypt_database(&aegis_backup.header.params, &master_key, &aegis_backup.db);
 
     if db.version != 2 {
         println!("Unsupported database version: {}", db.version);
