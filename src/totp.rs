@@ -3,9 +3,10 @@ use libreauth::{hash::HashFunction, oath::TOTPBuilder};
 use serde::Deserialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Hash algorithms for HOTP and TOTP
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
-enum HashAlgorithm {
+pub enum HashAlgorithm {
     Sha1,
     Sha256,
     Sha512,
@@ -13,18 +14,27 @@ enum HashAlgorithm {
 
 #[derive(Debug, Deserialize)]
 pub struct EntryInfo {
-    secret: String,
-    algo: HashAlgorithm,
-    digits: i32,
+    pub secret: String,
+    pub algo: HashAlgorithm,
+    pub digits: i32,
     pub period: i32,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum EntryTypes {
+    /// Not implemented.
+    ///
+    /// [RFC 4226](https://datatracker.ietf.org/doc/html/rfc4226)
     Hotp,
+
+    /// [RFC 6238](https://datatracker.ietf.org/doc/html/rfc6238)
     Totp,
+
+    /// Not implemented.
     Steam,
+
+    /// Not implemented.
     Yandex,
 }
 

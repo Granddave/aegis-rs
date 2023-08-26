@@ -6,8 +6,15 @@ use std::{env, fs, path::PathBuf};
 use std::{fs::File, io};
 
 /// Cryptographic functions and data structures used to decrypt database with TOTP entries
+///
+/// The official Aegis documentation for vault decryption and contents can be found
+/// [here](https://github.com/beemdevelopment/Aegis/blob/master/docs/vault.md#aegis-vault).
 mod crypto;
+
 /// Module for generating TOTP codes
+///
+/// The official Aegis documentation for code generation can be found
+/// [here](https://github.com/beemdevelopment/Aegis/blob/master/docs/vault.md#entries).
 pub mod totp;
 
 /// Database containing TOTP entries
@@ -30,7 +37,7 @@ pub struct Entry {
     pub info: totp::EntryInfo,
 }
 
-/// Aegis backup in JSON
+/// Encrypted Aegis backup
 #[derive(Debug, Deserialize)]
 pub struct AegisBackup {
     /// Backup version
@@ -71,7 +78,7 @@ pub fn parse_aegis_backup_file(path: &str) -> Result<Vec<Entry>> {
 
 /// Get password from user
 fn get_password() -> io::Result<String> {
-    // TODO: Break out
+    // TODO: Refactor out password filepath
     let home = env::var("HOME").expect("Failed to expand $HOME");
     let password_filepath = PathBuf::from(home).join(".config/aegis-pass.txt");
 

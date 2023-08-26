@@ -1,10 +1,13 @@
 extern crate serde_json;
 
+use aegis_rs::{
+    parse_aegis_backup_file,
+    totp::{calculate_remaining_time, generate_totp, EntryTypes},
+    Entry,
+};
 use color_eyre::eyre::{eyre, Result};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use std::env;
-
-pub mod aegis;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -14,10 +17,10 @@ fn main() -> Result<()> {
         Some(fp) => fp,
         None => return Err(eyre!("No filepath argument")),
     };
-    let entries: Vec<aegis::Entry> = aegis::parse_aegis_backup_file(filepath)?;
-    let totp_entries: Vec<&aegis::Entry> = entries
+    let entries: Vec<Entry> = parse_aegis_backup_file(filepath)?;
+    let totp_entries: Vec<&Entry> = entries
         .iter()
-        .filter(|e| e.r#type == aegis::totp::EntryTypes::Totp)
+        .filter(|e| e.r#type == EntryTypes::Totp)
         .collect();
 
     if totp_entries.is_empty() {
@@ -38,8 +41,8 @@ fn main() -> Result<()> {
             let totp_info = &totp_entries.get(index).unwrap().info;
             println!(
                 "{}, ({}s left)",
-                aegis::totp::generate_totp(totp_info)?,
-                aegis::totp::calculate_remaining_time(totp_info.period)
+                generate_totp(totp_info)?,
+                calculate_remaining_time(totp_info.period)
             );
         }
         None => {
