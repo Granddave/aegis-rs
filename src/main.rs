@@ -9,6 +9,14 @@ use color_eyre::eyre::{eyre, Result};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use std::env;
 
+fn set_sigint_hook() {
+    ctrlc::set_handler(move || {
+        // Reset terminal after
+        print!("{esc}c", esc = 27 as char);
+    })
+    .expect("Failed to set SIGINT handler");
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
 
@@ -32,6 +40,7 @@ fn main() -> Result<()> {
         .iter()
         .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
         .collect();
+    set_sigint_hook();
     let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
         .items(&items)
         .default(0)
@@ -49,7 +58,6 @@ fn main() -> Result<()> {
             println!("No selection");
         }
     }
-    // TODO: Reset terminal on exit
 
     Ok(())
 }
