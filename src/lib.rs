@@ -39,7 +39,7 @@ pub struct Entry {
 
 /// Encrypted Aegis backup
 #[derive(Debug, Deserialize)]
-pub struct AegisBackup {
+pub struct EncryptedDatabase {
     /// Backup version
     version: u32,
     /// Information to decrypt master key
@@ -56,46 +56,36 @@ pub fn parse_aegis_backup_file(path: &str) -> Result<Vec<Entry>> {
 
     let parsed_file: serde_json::Value = serde_json::from_str(&contents)?;
 
-    match serde_json::from_value(parsed_file.clone()) {
-        Ok(value) => {
-            let aegis_backup: AegisBackup = value;
-
-            if aegis_backup.version != 1 {
-                return Err(eyre!(format!(
-                    "Unsupported vault version: {}",
-                    aegis_backup.version
-                )));
-            }
-
-            // TODO: Allow plaintext backup
-            let password = get_password()?;
-            let db = crypto::decrypt(password.as_str(), aegis_backup); // TODO: Return a result
-
-            if db.version != 2 {
-                return Err(eyre!(format!(
-                    "Unsupported database version: {}",
-                    db.version
-                )));
-            }
-
-            Ok(db.entries)
-        }
+    let db: Database = match serde_json::from_value(parsed_file.clone()) {
+        Ok(value) => value, // JSON is a plain text database
         Err(_) => match serde_json::from_value(parsed_file) {
-            Ok(value) => {
-                let db: Database = value;
-
-                if db.version != 2 {
-                    return Err(eyre!(format!(
-                        "Unsupported database version: {}",
-                        db.version
-                    )));
-                }
-
-                Ok(db.entries)
-            }
-            Err(_) => Err(eyre!("Failed to parse file")),
+            Ok(value) => decrypt_database(value)?, // JSON is an encrypted database
+            Err(_) => return Err(eyre!("Failed to parse file")),
         },
+    };
+
+    if db.version != 2 {
+        return Err(eyre!(format!(
+            "Unsupported database version: {}",
+            db.version
+        )));
     }
+
+    Ok(db.entries)
+}
+
+fn decrypt_database(aegis_backup: EncryptedDatabase) -> Result<Database> {
+    if aegis_backup.version != 1 {
+        return Err(eyre!(format!(
+            "Unsupported vault version: {}",
+            aegis_backup.version
+        )));
+    }
+
+    let password = get_password()?;
+    let db = crypto::decrypt(password.as_str(), aegis_backup); // TODO: Return a result
+
+    Ok(db)
 }
 
 /// Get password from user

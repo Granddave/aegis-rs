@@ -1,4 +1,4 @@
-use super::{AegisBackup, Database};
+use super::{Database, EncryptedDatabase};
 use aes_gcm::{aead::AeadMut, Aes256Gcm, KeyInit, Nonce};
 use base64::{engine::general_purpose, Engine as _};
 use hex::FromHex;
@@ -119,7 +119,7 @@ fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Da
 }
 
 // TODO: Return Result instead of exit
-pub fn decrypt(password: &str, aegis_backup: AegisBackup) -> Database {
+pub fn decrypt(password: &str, aegis_backup: EncryptedDatabase) -> Database {
     let master_key = match decrypt_master_key(password, &aegis_backup.header.slots) {
         Some(master_key) => master_key,
         None => {
