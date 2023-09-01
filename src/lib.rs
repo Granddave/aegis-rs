@@ -53,27 +53,49 @@ pub fn parse_aegis_backup_file(path: &str) -> Result<Vec<Entry>> {
     let mut file = File::open(path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
-    let aegis_backup: AegisBackup = serde_json::from_str(&contents)?;
 
-    if aegis_backup.version != 1 {
-        return Err(eyre!(format!(
-            "Unsupported vault version: {}",
-            aegis_backup.version
-        )));
+    let parsed_file: serde_json::Value = serde_json::from_str(&contents)?;
+
+    match serde_json::from_value(parsed_file.clone()) {
+        Ok(value) => {
+            let aegis_backup: AegisBackup = value;
+
+            if aegis_backup.version != 1 {
+                return Err(eyre!(format!(
+                    "Unsupported vault version: {}",
+                    aegis_backup.version
+                )));
+            }
+
+            // TODO: Allow plaintext backup
+            let password = get_password()?;
+            let db = crypto::decrypt(password.as_str(), aegis_backup); // TODO: Return a result
+
+            if db.version != 2 {
+                return Err(eyre!(format!(
+                    "Unsupported database version: {}",
+                    db.version
+                )));
+            }
+
+            Ok(db.entries)
+        }
+        Err(_) => match serde_json::from_value(parsed_file) {
+            Ok(value) => {
+                let db: Database = value;
+
+                if db.version != 2 {
+                    return Err(eyre!(format!(
+                        "Unsupported database version: {}",
+                        db.version
+                    )));
+                }
+
+                Ok(db.entries)
+            }
+            Err(_) => Err(eyre!("Failed to parse file")),
+        },
     }
-
-    // TODO: Allow plaintext backup
-    let password = get_password()?;
-    let db = crypto::decrypt(password.as_str(), aegis_backup); // TODO: Return a result
-
-    if db.version != 2 {
-        return Err(eyre!(format!(
-            "Unsupported database version: {}",
-            db.version
-        )));
-    }
-
-    Ok(db.entries)
 }
 
 /// Get password from user
