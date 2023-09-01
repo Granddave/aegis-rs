@@ -1,3 +1,5 @@
+![ci](https://github.com/Granddave/aegis-rs/actions/workflows/ci.yaml/badge.svg)
+
 # Aegis CLI tool
 
 This is a CLI tool for generating TOTP codes from a backup vault from [Aegis Authenticator](https://github.com/beemdevelopment/Aegis).
