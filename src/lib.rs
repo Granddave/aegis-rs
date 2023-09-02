@@ -37,9 +37,9 @@ pub struct Entry {
     pub info: totp::EntryInfo,
 }
 
-/// Encrypted Aegis backup
+/// Encrypted Aegis vault backup
 #[derive(Debug, Deserialize)]
-pub struct EncryptedDatabase {
+pub struct Vault {
     /// Backup version
     version: u32,
     /// Information to decrypt master key
@@ -48,20 +48,15 @@ pub struct EncryptedDatabase {
     db: String,
 }
 
-/// Parse database from JSON file. A list of entries are returned.
-pub fn parse_aegis_backup_file(path: &str) -> Result<Vec<Entry>> {
+/// Parse vault from JSON file. A list of entries are returned.
+pub fn parse_aegis_vault(path: &str) -> Result<Vec<Entry>> {
     let mut file = File::open(path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 
-    let parsed_file: serde_json::Value = serde_json::from_str(&contents)?;
-
-    let db: Database = match serde_json::from_value(parsed_file.clone()) {
-        Ok(value) => value, // JSON is a plain text database
-        Err(_) => match serde_json::from_value(parsed_file) {
-            Ok(value) => decrypt_database(value)?, // JSON is an encrypted database
-            Err(_) => return Err(eyre!("Failed to parse file")),
-        },
+    let db: Database = match serde_json::from_str(&contents) {
+        Ok(value) => import_database(value)?,
+        Err(_) => return Err(eyre!("Failed to parse file")),
     };
 
     if db.version != 2 {
@@ -74,16 +69,20 @@ pub fn parse_aegis_backup_file(path: &str) -> Result<Vec<Entry>> {
     Ok(db.entries)
 }
 
-fn decrypt_database(aegis_backup: EncryptedDatabase) -> Result<Database> {
-    if aegis_backup.version != 1 {
+fn import_database(vault: Vault) -> Result<Database> {
+    if vault.version != 1 {
         return Err(eyre!(format!(
             "Unsupported vault version: {}",
-            aegis_backup.version
+            vault.version
         )));
     }
 
+    if !vault.header.is_set() {
+        return Ok(serde_json::from_str(&vault.db).expect("Failed to parse JSON"));
+    }
+
     let password = get_password()?;
-    let db = crypto::decrypt(password.as_str(), aegis_backup); // TODO: Return a result
+    let db = crypto::decrypt(password.as_str(), vault); // TODO: Return a result
 
     Ok(db)
 }

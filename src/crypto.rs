@@ -1,4 +1,4 @@
-use super::{Database, EncryptedDatabase};
+use super::{Database, Vault};
 use aes_gcm::{aead::AeadMut, Aes256Gcm, KeyInit, Nonce};
 use base64::{engine::general_purpose, Engine as _};
 use hex::FromHex;
@@ -43,9 +43,17 @@ struct Slot {
 #[derive(Debug, Deserialize)]
 pub struct Header {
     /// Master key decryption slots
-    slots: Vec<Slot>,
+    slots: Option<Vec<Slot>>,
     /// AES encryption parameters for the database
-    params: KeyParams,
+    params: Option<KeyParams>,
+}
+
+impl Header {
+    /// The fields in the encryption header will not be set if the database in the vault is
+    /// in plain text.
+    pub fn is_set(&self) -> bool {
+        self.slots.is_some() && self.params.is_some()
+    }
 }
 
 /// Derive master key from password
@@ -119,8 +127,9 @@ fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Da
 }
 
 // TODO: Return Result instead of exit
-pub fn decrypt(password: &str, aegis_backup: EncryptedDatabase) -> Database {
-    let master_key = match decrypt_master_key(password, &aegis_backup.header.slots) {
+pub fn decrypt(password: &str, vault: Vault) -> Database {
+    let slots = vault.header.slots.expect("Expected slots to be set");
+    let master_key = match decrypt_master_key(password, &slots) {
         Some(master_key) => master_key,
         None => {
             println!("Wrong password, try again.");
@@ -128,5 +137,6 @@ pub fn decrypt(password: &str, aegis_backup: EncryptedDatabase) -> Database {
         }
     };
 
-    decrypt_database(&aegis_backup.header.params, &master_key, &aegis_backup.db)
+    let params = vault.header.params.expect("Expected params to be set");
+    decrypt_database(&params, &master_key, &vault.db)
 }

@@ -1,7 +1,7 @@
 extern crate serde_json;
 
 use aegis_rs::{
-    parse_aegis_backup_file,
+    parse_aegis_vault,
     totp::{calculate_remaining_time, generate_totp, EntryTypes},
     Entry,
 };
@@ -25,7 +25,7 @@ fn main() -> Result<()> {
         Some(fp) => fp,
         None => return Err(eyre!("No filepath argument")),
     };
-    let entries: Vec<Entry> = parse_aegis_backup_file(filepath)?;
+    let entries: Vec<Entry> = parse_aegis_vault(filepath)?;
     let totp_entries: Vec<&Entry> = entries
         .iter()
         .filter(|e| e.r#type == EntryTypes::Totp)
