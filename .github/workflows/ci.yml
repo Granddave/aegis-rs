@@ -25,10 +25,13 @@ jobs:
         with:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
-          components: rustfmt
+          components: rustfmt, clippy
 
       - name: Format
         run: cargo fmt --all -- --check
 
       - name: Build
         run: cargo build --verbose
+
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
