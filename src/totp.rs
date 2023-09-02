@@ -22,7 +22,7 @@ pub struct EntryInfo {
 
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum EntryTypes {
+pub enum EntryType {
     /// Not implemented.
     ///
     /// [RFC 4226](https://datatracker.ietf.org/doc/html/rfc4226)

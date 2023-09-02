@@ -2,7 +2,7 @@ extern crate serde_json;
 
 use aegis_rs::{
     parse_aegis_vault,
-    totp::{calculate_remaining_time, generate_totp, EntryTypes},
+    totp::{calculate_remaining_time, generate_totp, EntryType},
     Entry,
 };
 use color_eyre::eyre::{eyre, Result};
@@ -28,7 +28,7 @@ fn main() -> Result<()> {
     let entries: Vec<Entry> = parse_aegis_vault(filepath)?;
     let totp_entries: Vec<&Entry> = entries
         .iter()
-        .filter(|e| e.r#type == EntryTypes::Totp)
+        .filter(|e| e.r#type == EntryType::Totp)
         .collect();
 
     if totp_entries.is_empty() {

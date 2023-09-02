@@ -27,7 +27,7 @@ pub struct Database {
 /// TOTP entry with information used to generate one time codes
 #[derive(Debug, Deserialize)]
 pub struct Entry {
-    pub r#type: totp::EntryTypes,
+    pub r#type: totp::EntryType,
     // pub uuid: String,
     pub name: String,
     pub issuer: String,
