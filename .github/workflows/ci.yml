@@ -21,8 +21,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Select toolchain
-        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.toolchain }}
+          components: rustfmt
+
+      - name: Format
+        run: cargo fmt --all -- --check
 
       - name: Build
         run: cargo build --verbose
