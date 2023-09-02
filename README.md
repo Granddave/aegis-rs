@@ -34,4 +34,4 @@ This is a CLI tool for generating TOTP codes from a backup vault from [Aegis Aut
 - [ ] Support unencrypted vaults
 - [ ] Display digits in groups
 - [ ] Add TOTP to clipboard
-- [ ] Add CI
+- [x] Add CI
