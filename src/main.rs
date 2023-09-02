@@ -51,7 +51,7 @@ fn main() -> Result<()> {
             println!(
                 "{}, ({}s left)",
                 generate_totp(totp_info)?,
-                calculate_remaining_time(totp_info.period)
+                calculate_remaining_time(totp_info.period.unwrap())
             );
         }
         None => {

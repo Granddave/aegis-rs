@@ -17,7 +17,7 @@ pub struct EntryInfo {
     pub secret: String,
     pub algo: HashAlgorithm,
     pub digits: i32,
-    pub period: i32,
+    pub period: Option<i32>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -47,7 +47,7 @@ pub fn generate_totp(info: &EntryInfo) -> Result<String> {
             HashAlgorithm::Sha512 => HashFunction::Sha512,
         })
         .output_len(info.digits.try_into()?)
-        .period(info.period.try_into()?)
+        .period(info.period.unwrap().try_into()?)
         .finalize()?
         .generate();
     Ok(code)
