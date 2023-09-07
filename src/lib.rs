@@ -55,8 +55,8 @@ pub fn parse_aegis_vault(path: &str) -> Result<Vec<Entry>> {
     file.read_to_string(&mut contents)?;
 
     let db: Database = match serde_json::from_str(&contents) {
-        Ok(value) => import_database(value)?,
-        Err(_) => return Err(eyre!("Failed to parse file")),
+        Ok(vault) => extract_database(vault)?,
+        Err(_) => return Err(eyre!("Failed to parse vault file")),
     };
 
     if db.version != 2 {
@@ -69,7 +69,7 @@ pub fn parse_aegis_vault(path: &str) -> Result<Vec<Entry>> {
     Ok(db.entries)
 }
 
-fn import_database(vault: Vault) -> Result<Database> {
+fn extract_database(vault: Vault) -> Result<Database> {
     if vault.version != 1 {
         return Err(eyre!(format!(
             "Unsupported vault version: {}",
@@ -78,13 +78,18 @@ fn import_database(vault: Vault) -> Result<Database> {
     }
 
     if !vault.header.is_set() {
-        return Ok(serde_json::from_str(&vault.db).expect("Failed to parse JSON"));
+        // Database in vault is in plaintext, just parse the JSON
+        return match serde_json::from_str(&vault.db) {
+            Ok(db) => Ok(db),
+            Err(_) => Err(eyre!("Failed to parse JSON")),
+        };
+    } else {
+        // Database in vault is encrypted
+        let password = get_password()?;
+        let db = crypto::decrypt(password.as_str(), vault); // TODO: Return a result
+
+        return Ok(db);
     }
-
-    let password = get_password()?;
-    let db = crypto::decrypt(password.as_str(), vault); // TODO: Return a result
-
-    Ok(db)
 }
 
 /// Get password from user
