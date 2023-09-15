@@ -86,7 +86,7 @@ fn extract_database(vault: Vault) -> Result<Database> {
     } else {
         // Database in vault is encrypted
         let password = get_password()?;
-        let db = crypto::decrypt(password.as_str(), vault); // TODO: Return a result
+        let db = crypto::decrypt(password.as_str(), vault)?;
 
         return Ok(db);
     }

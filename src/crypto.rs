@@ -1,6 +1,7 @@
 use super::{Database, Vault};
 use aes_gcm::{aead::AeadMut, Aes256Gcm, KeyInit, Nonce};
 use base64::{engine::general_purpose, Engine as _};
+use color_eyre::eyre::{eyre, Result};
 use hex::FromHex;
 use password_hash::Output;
 use scrypt::{
@@ -126,17 +127,19 @@ fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Da
     db
 }
 
-// TODO: Return Result instead of exit
-pub fn decrypt(password: &str, vault: Vault) -> Database {
-    let slots = vault.header.slots.expect("Expected slots to be set");
-    let master_key = match decrypt_master_key(password, &slots) {
-        Some(master_key) => master_key,
-        None => {
-            println!("Wrong password, try again.");
-            std::process::exit(1);
-        }
+pub fn decrypt(password: &str, vault: Vault) -> Result<Database> {
+    let slots = match vault.header.slots {
+        Some(slots) => slots,
+        None => return Err(eyre!("Vault header slots are unavailable")),
+    };
+    let params = match vault.header.params {
+        Some(slots) => slots,
+        None => return Err(eyre!("Vault header parameters are unavailable")),
     };
 
-    let params = vault.header.params.expect("Expected params to be set");
-    decrypt_database(&params, &master_key, &vault.db)
+    let master_key = match decrypt_master_key(password, &slots) {
+        Some(master_key) => master_key,
+        None => return Err(eyre!("Failed to decrypt database")),
+    };
+    Ok(decrypt_database(&params, &master_key, &vault.db))
 }
