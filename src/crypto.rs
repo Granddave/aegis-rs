@@ -57,74 +57,101 @@ impl Header {
     }
 }
 
-/// Derive master key from password
-fn derive_key(password: &[u8], slot: &Slot) -> Output {
-    let salt = SaltString::from_b64(
-        &general_purpose::STANDARD_NO_PAD
-            .encode(Vec::from_hex(slot.salt.as_ref().unwrap()).expect("Failed to decode hex")),
-    )
-    .expect("Failed to parse salt");
+/// Derive master key from password and return Output or KeyDecryptionError
+fn derive_key(password: &[u8], slot: &Slot) -> Result<Output> {
+    let salt_hex = slot.salt.as_ref().ok_or(eyre!("Salt is unavailable"))?;
+    let salt_bytes = Vec::from_hex(salt_hex).map_err(|e| eyre!("Failed to decode hex: {}", e))?;
+    let salt = SaltString::from_b64(&general_purpose::STANDARD_NO_PAD.encode(salt_bytes))
+        .map_err(|e| eyre!("Failed to decode base64: {}", e))?;
 
-    let n = (slot.n.unwrap() as f32).log2() as u8;
-    let r = slot.r.unwrap() as u32;
-    let p = slot.p.unwrap() as u32;
+    let n = (slot.n.ok_or(eyre!("n parameter missing"))? as f32).log2() as u8;
+    let r = slot.r.ok_or(eyre!("r parameter missing"))? as u32;
+    let p = slot.p.ok_or(eyre!("p parameter missing"))? as u32;
 
-    let scrypt_params = scrypt::Params::new(n, r, p, 32).expect("Failed to set scrypt params");
+    let scrypt_params = scrypt::Params::new(n, r, p, 32)?;
     let derived_key = Scrypt
         .hash_password_customized(password, None, None, scrypt_params, &salt)
-        .expect("Failed to derive key");
+        .map_err(|e| eyre!("Failed to derive key: {}", e))?;
 
-    derived_key.hash.expect("Failed to get hash of derived key")
+    derived_key
+        .hash
+        .ok_or(eyre!("Failed to get hash of derived key"))
 }
 
-fn decrypt_master_key(password: &str, slots: &[Slot]) -> Option<Vec<u8>> {
+fn decrypt_master_key(password: &str, slot: &Slot) -> Result<Vec<u8>> {
+    // Derive a key from the provided password and the salt from the file
+    let derived_key = derive_key(password.as_bytes(), slot)?;
+    let key_nonce = match Vec::from_hex(&slot.key_params.nonce) {
+        Ok(nonce) => nonce,
+        Err(_) => return Err(eyre!("Failed to decode nonce")),
+    };
+
+    let mut master_key_cipher = match Vec::from_hex(&slot.key) {
+        Ok(cipher) => cipher,
+        Err(_) => return Err(eyre!("Failed to decode master key cipher")),
+    }
+    .to_vec();
+    master_key_cipher.extend_from_slice(match &Vec::from_hex(&slot.key_params.tag) {
+        Ok(tag) => tag,
+        Err(_) => return Err(eyre!("Failed to decode tag")),
+    });
+
+    // Decrypt master key
+    let mut cipher = Aes256Gcm::new(derived_key.as_bytes().into());
+    match cipher.decrypt(Nonce::from_slice(&key_nonce), master_key_cipher.as_ref()) {
+        Ok(master_key) => return Ok(master_key),
+        Err(_) => return Err(eyre!("Failed to decrypt master key")),
+    }
+}
+
+fn try_decrypt_master_key(password: &str, slots: &[Slot]) -> Result<Vec<u8>> {
     // Only password based master key decryptions are supported
     for slot in slots
         .iter()
         .filter(|s| s.r#type == SlotType::Password)
         .collect::<Vec<&Slot>>()
     {
-        // Derive a key from the provided password and the salt from the file
-        let derived_key = derive_key(password.as_bytes(), slot);
-        let key_nonce = Vec::from_hex(&slot.key_params.nonce).expect("Unexpected nonce format");
-        let mut master_key_cipher = Vec::from_hex(&slot.key)
-            .expect("Unexpected key format")
-            .to_vec();
-        master_key_cipher.extend_from_slice(
-            &Vec::from_hex(&slot.key_params.tag).expect("Unexpected tag format"),
-        );
+        let master_key = decrypt_master_key(password, slot)?;
+        // Ok(key) => key,
+        // Err(_) => {
+        //     println!("Incorrect password");
+        //     continue;
+        // }
+        // };
 
-        // Decrypt master key
-        let mut cipher = Aes256Gcm::new(derived_key.as_bytes().into());
-        match cipher.decrypt(Nonce::from_slice(&key_nonce), master_key_cipher.as_ref()) {
-            Ok(master_key) => {
-                return Some(master_key);
-            }
-            Err(_) => continue,
-        };
+        return Ok(master_key);
     }
 
-    None
+    Err(eyre!("No matching decryption slot found"))
 }
 
-fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Database {
-    let db_nonce = Vec::from_hex(&params.nonce).expect("Unexpected nonce format");
-    let db_tag = Vec::from_hex(&params.tag).expect("Unexpected tag format");
-    let db_contents_cipher = general_purpose::STANDARD
-        .decode(db)
-        .expect("Unexpected database format");
+fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Result<Database> {
+    let db_nonce = match Vec::from_hex(&params.nonce) {
+        Ok(nonce) => nonce,
+        Err(_) => return Err(eyre!("Failed to decode nonce")),
+    };
+    let db_tag = match Vec::from_hex(&params.tag) {
+        Ok(tag) => tag,
+        Err(_) => return Err(eyre!("Failed to decode tag")),
+    };
+    let db_contents_cipher = match general_purpose::STANDARD.decode(db) {
+        Ok(cipher) => cipher,
+        Err(_) => return Err(eyre!("Failed to decode database")),
+    };
 
     let mut cipher_db = Aes256Gcm::new(master_key.as_slice().into());
     let mut db_cipher: Vec<u8> = db_contents_cipher;
     db_cipher.extend_from_slice(&db_tag);
-    let db_contents = cipher_db
-        .decrypt(Nonce::from_slice(&db_nonce), db_cipher.as_ref())
-        .expect("Failed to decrypt database");
 
-    let db_contents_str = String::from_utf8(db_contents).expect("Unexpected UTF-8 format");
-    let db: Database = serde_json::from_str(&db_contents_str).expect("Failed to parse JSON");
+    let db_contents = match cipher_db.decrypt(Nonce::from_slice(&db_nonce), db_cipher.as_ref()) {
+        Ok(contents) => contents,
+        Err(_) => return Err(eyre!("Failed to decrypt database")),
+    };
 
-    db
+    let db_contents_str = String::from_utf8(db_contents)?;
+    let db: Database = serde_json::from_str(&db_contents_str)?;
+
+    Ok(db)
 }
 
 pub fn decrypt(password: &str, vault: Vault) -> Result<Database> {
@@ -137,9 +164,7 @@ pub fn decrypt(password: &str, vault: Vault) -> Result<Database> {
         None => return Err(eyre!("Vault header parameters are unavailable")),
     };
 
-    let master_key = match decrypt_master_key(password, &slots) {
-        Some(master_key) => master_key,
-        None => return Err(eyre!("Failed to decrypt database")),
-    };
-    Ok(decrypt_database(&params, &master_key, &vault.db))
+    let master_key = try_decrypt_master_key(password, &slots)?;
+
+    decrypt_database(&params, &master_key, &vault.db)
 }
