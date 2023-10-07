@@ -17,6 +17,69 @@ mod crypto;
 /// [here](https://github.com/beemdevelopment/Aegis/blob/master/docs/vault.md#entries).
 pub mod totp;
 
+// #[derive(PartialEq)]
+// enum PasswordSources {
+//     File,
+//     Prompt,
+// }
+//
+// struct PasswordSource {
+//     password_filepath: Option<String>,
+//     password_file_failed: bool,
+//     last_source: Option<PasswordSources>,
+// }
+//
+// impl PasswordSource {
+//     fn new() -> Self {
+//         let home = env::var("HOME").expect("Failed to expand $HOME");
+//         let password_filepath = PathBuf::from(home).join(".config/aegis-pass.txt");
+//         let password_file_exists = fs::metadata(&password_filepath).is_ok();
+//         Self {
+//             password_filepath: match password_file_exists {
+//                 true => Some(password_filepath.to_str().unwrap().to_string()),
+//                 false => None,
+//             },
+//             password_file_failed: false,
+//             last_source: None,
+//         }
+//     }
+//
+//     fn get_password(&self) -> Result<String> {
+//         if !self.password_filepath.is_some() && !self.password_file_failed {
+//             let password = fs::read_to_string(&self.password_filepath)?;
+//             self.last_source = Some(PasswordSources::File);
+//             return Ok(password.trim().to_string());
+//         } else {
+//             return match Password::with_theme(&ColorfulTheme::default())
+//                 .with_prompt("Insert Aegis Password")
+//                 .interact()
+//             {
+//                 Ok(password) => {
+//                     self.last_source = Some(PasswordSources::Prompt);
+//                     Ok(password)
+//                 }
+//                 Err(_) => Err(eyre!("Failed to get password")),
+//             };
+//         }
+//     }
+//
+//     fn try_available(&mut self) -> bool {
+//         // First try password file
+//         if self.password_file_failed {
+//             return false;
+//         }
+//
+//         // If that fails, prompt user
+//         if self.last_source == Some(PasswordSources::File) {
+//             self.password_file_failed = true;
+//             return true;
+//         }
+//
+//         // If that fails three times, return false
+//         return false;
+//     }
+// }
+
 /// Database containing TOTP entries
 #[derive(Debug, Deserialize)]
 pub struct Database {
