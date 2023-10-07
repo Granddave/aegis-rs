@@ -48,6 +48,12 @@ pub struct Vault {
     db: String,
 }
 
+impl Vault {
+    pub fn is_encrypted(&self) -> bool {
+        self.header.is_set()
+    }
+}
+
 /// Parse vault from JSON file. A list of entries are returned.
 pub fn parse_aegis_vault(path: &str) -> Result<Vec<Entry>> {
     let mut file = File::open(path)?;
@@ -77,7 +83,7 @@ fn extract_database(vault: Vault) -> Result<Database> {
         )));
     }
 
-    if !vault.header.is_set() {
+    if !vault.is_encrypted() {
         // Database in vault is in plaintext, just parse the JSON
         return match serde_json::from_str(&vault.db) {
             Ok(db) => Ok(db),
