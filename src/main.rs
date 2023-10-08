@@ -7,7 +7,7 @@ use aegis_rs::{
 };
 use color_eyre::eyre::{eyre, Result};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use std::env;
+use std::{env, fs::File, io::Read};
 
 fn set_sigint_hook() {
     ctrlc::set_handler(move || {
@@ -25,7 +25,10 @@ fn main() -> Result<()> {
         Some(fp) => fp,
         None => return Err(eyre!("No filepath argument")),
     };
-    let entries: Vec<Entry> = parse_aegis_vault(filepath)?;
+    let mut file = File::open(filepath)?;
+    let mut file_contents = String::new();
+    file.read_to_string(&mut file_contents)?;
+    let entries: Vec<Entry> = parse_aegis_vault(&file_contents)?;
     let totp_entries: Vec<&Entry> = entries
         .iter()
         .filter(|e| e.r#type == EntryType::Totp)

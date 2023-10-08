@@ -67,8 +67,7 @@ fn derive_key(password: &[u8], slot: &Slot) -> Result<Output> {
     let salt_hex = slot.salt.as_ref().ok_or(eyre!("Salt is unavailable"))?;
     let salt_bytes =
         Vec::from_hex(salt_hex).map_err(|e| eyre!("Failed to decode salt hex: {}", e))?;
-    let salt = SaltString::from_b64(&general_purpose::STANDARD_NO_PAD.encode(salt_bytes))
-        .map_err(|e| eyre!("Failed to decode salt base64: {}", e))?;
+    let salt = SaltString::encode_b64(&salt_bytes)?;
 
     let n = (slot.n.ok_or(eyre!("n parameter unavailable"))? as f32).log2() as u8;
     let r = slot.r.ok_or(eyre!("r parameter unavailable"))? as u32;
