@@ -57,7 +57,7 @@ impl Vault {
 
 /// Parse vault from JSON. A list of entries are returned.
 pub fn parse_aegis_vault(vault_backup_contents: &str) -> Result<Vec<Entry>> {
-    let db: Database = match serde_json::from_str(&vault_backup_contents) {
+    let db: Database = match serde_json::from_str(vault_backup_contents) {
         Ok(vault) => extract_database(vault)?,
         Err(_) => return Err(eyre!("Failed to parse vault file")),
     };
