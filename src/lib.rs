@@ -1,9 +1,8 @@
 use color_eyre::eyre::{eyre, Result};
 use dialoguer::{theme::ColorfulTheme, Password};
 use serde::Deserialize;
-use std::io::Read;
+use std::io;
 use std::{env, fs, path::PathBuf};
-use std::{fs::File, io};
 
 /// Cryptographic functions and data structures used to decrypt database with TOTP entries
 ///

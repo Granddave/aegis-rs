@@ -24,8 +24,8 @@ This is a CLI tool for generating TOTP codes from a backup vault from [Aegis Aut
 ## TODO
 
 - [x] Add password file feature
-- [ ] Add countdown timer and refresh TOTP code after timeout
-- [ ] Improve on error handling
+- [x] Add countdown timer and refresh TOTP code after timeout
+- [x] Improve on error handling
 - [ ] Support different TOTP algorithms
     - [x] TOTP
     - [ ] HOTP

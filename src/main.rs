@@ -2,19 +2,40 @@ extern crate serde_json;
 
 use aegis_rs::{
     parse_aegis_vault,
-    totp::{calculate_remaining_time, generate_totp, EntryType},
+    totp::{calculate_remaining_time, generate_totp, EntryInfo, EntryType},
     Entry,
 };
 use color_eyre::eyre::{eyre, Result};
+use console::{Style, Term};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use std::{env, fs::File, io::Read};
+use std::{env, fs::File, io::Read, process::exit, time::Duration};
 
 fn set_sigint_hook() {
     ctrlc::set_handler(move || {
-        // Reset terminal after
-        print!("{esc}c", esc = 27 as char);
+        Term::stdout().show_cursor().expect("Shwoing cursor");
+        exit(0);
     })
-    .expect("Failed to set SIGINT handler");
+    .expect("Setting SIGINT handler");
+}
+
+fn print_totp_every_second(totp_info: &EntryInfo) -> Result<()> {
+    let term = Term::stdout();
+    term.hide_cursor()?;
+    loop {
+        let totp_code = generate_totp(totp_info)?;
+        let remaining_time = calculate_remaining_time(totp_info.period.ok_or(eyre!("No period"))?);
+        let style = match remaining_time {
+            0..=5 => Style::new().red(),
+            6..=15 => Style::new().yellow(),
+            _ => Style::new().green(),
+        };
+        let line = style
+            .bold()
+            .apply_to(format!("{} ({}s left)", totp_code, remaining_time));
+        term.write_line(line.to_string().as_str())?;
+        std::thread::sleep(Duration::from_secs(1));
+        term.clear_last_lines(1)?;
+    }
 }
 
 fn main() -> Result<()> {
@@ -51,11 +72,7 @@ fn main() -> Result<()> {
     match selection {
         Some(index) => {
             let totp_info = &totp_entries.get(index).unwrap().info;
-            println!(
-                "{}, ({}s left)",
-                generate_totp(totp_info)?,
-                calculate_remaining_time(totp_info.period.unwrap())
-            );
+            print_totp_every_second(totp_info)?;
         }
         None => {
             println!("No selection");
