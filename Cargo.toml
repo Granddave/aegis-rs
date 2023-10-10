@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 aes-gcm = "0.10.2"
+arboard = "3.2.1"
 base64 = "0.21.2"
 color-eyre = "0.6"
 console = "0.15.7"

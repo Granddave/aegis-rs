@@ -21,9 +21,18 @@ fn set_sigint_hook() {
 fn print_totp_every_second(totp_info: &EntryInfo) -> Result<()> {
     let term = Term::stdout();
     term.hide_cursor()?;
+
+    let mut clipboard = arboard::Clipboard::new()?;
+    let mut totp_code = String::new();
+    let mut last_remaining_time = 0;
+
     loop {
-        let totp_code = generate_totp(totp_info)?;
         let remaining_time = calculate_remaining_time(totp_info.period.ok_or(eyre!("No period"))?);
+        if last_remaining_time < remaining_time {
+            totp_code = generate_totp(totp_info)?;
+            clipboard.set_text(totp_code.clone())?;
+        }
+
         let style = match remaining_time {
             0..=5 => Style::new().red(),
             6..=15 => Style::new().yellow(),
@@ -35,6 +44,7 @@ fn print_totp_every_second(totp_info: &EntryInfo) -> Result<()> {
         term.write_line(line.to_string().as_str())?;
         std::thread::sleep(Duration::from_secs(1));
         term.clear_last_lines(1)?;
+        last_remaining_time = remaining_time;
     }
 }
 
