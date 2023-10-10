@@ -29,7 +29,7 @@ fn print_totp_every_second(totp_info: &EntryInfo) -> Result<()> {
     loop {
         let remaining_time = calculate_remaining_time(totp_info.period.ok_or(eyre!("No period"))?);
         if last_remaining_time < remaining_time {
-            totp_code = generate_totp(totp_info)?;
+            totp_code = generate_totp(totp_info, 3)?;
             clipboard.set_text(totp_code.clone())?;
         }
 

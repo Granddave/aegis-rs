@@ -38,8 +38,8 @@ pub enum EntryType {
     Yandex,
 }
 
-pub fn generate_totp(info: &EntryInfo) -> Result<String> {
-    let code = TOTPBuilder::new()
+pub fn generate_totp(info: &EntryInfo, group_size: i32) -> Result<String> {
+    let mut code = TOTPBuilder::new()
         .base32_key(&info.secret.to_string())
         .hash_function(match info.algo {
             HashAlgorithm::Sha1 => HashFunction::Sha1,
@@ -50,7 +50,19 @@ pub fn generate_totp(info: &EntryInfo) -> Result<String> {
         .period(info.period.unwrap().try_into()?)
         .finalize()?
         .generate();
-    Ok(code)
+
+    Ok(match group_size {
+        3 => {
+            code.insert(3, ' ');
+            code
+        }
+        2 => {
+            code.insert(2, ' ');
+            code.insert(5, ' ');
+            code
+        }
+        _ => code,
+    })
 }
 
 pub fn calculate_remaining_time(period_length_s: i32) -> i32 {
