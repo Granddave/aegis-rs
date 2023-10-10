@@ -11,6 +11,7 @@ This is a CLI tool for generating TOTP codes from a backup vault from [Aegis Aut
 - Fuzzy selection
 - TOTP generation (Currently just SHA1)
 - Time left indication
+- Clipboard support
 
 
 ## Resources
