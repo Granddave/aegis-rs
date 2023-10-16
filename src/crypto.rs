@@ -11,12 +11,14 @@ use scrypt::{
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
 
+/// AES-GCM encryption parameters
 #[derive(Debug, Deserialize)]
 struct KeyParams {
     nonce: String,
     tag: String,
 }
 
+/// Master key decryption slot types supported by Aegis
 #[derive(Debug, Deserialize_repr, PartialEq)]
 #[repr(u8)]
 enum SlotType {
@@ -25,7 +27,8 @@ enum SlotType {
     Biometric = 2,
 }
 
-/// Information for decrypting the master key
+/// Master key decryption slot. The master key is encrypted with a key derived from the password.
+/// The key derivation parameters are stored in the slot.
 #[derive(Debug, Deserialize)]
 struct Slot {
     r#type: SlotType,
@@ -40,18 +43,18 @@ struct Slot {
     // is_backup: Option<bool>,
 }
 
-/// Information about the database encryption
+/// Database encryption header
 #[derive(Debug, Deserialize)]
 pub struct Header {
-    /// Master key decryption slots
+    /// List of master key decryption slots
     slots: Option<Vec<Slot>>,
-    /// AES encryption parameters for the database
+    /// Master key encryption parameters
     params: Option<KeyParams>,
 }
 
 impl Header {
-    /// The fields in the encryption header will not be set if the database in the vault is
-    /// in plain text.
+    /// The fields in the encryption header will not be set if the database in the vault is in
+    /// plain text.
     pub fn is_set(&self) -> bool {
         self.slots.is_some() && self.params.is_some()
     }
