@@ -1,10 +1,10 @@
 use color_eyre::eyre::Result;
 use libreauth::{hash::HashFunction, oath::TOTPBuilder};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Hash algorithms for HOTP and TOTP
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum HashAlgorithm {
     Sha1,
@@ -12,7 +12,7 @@ pub enum HashAlgorithm {
     Sha512,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct EntryInfo {
     pub secret: String,
     pub algo: HashAlgorithm,
@@ -20,7 +20,7 @@ pub struct EntryInfo {
     pub period: Option<i32>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum EntryType {
     /// Not implemented.

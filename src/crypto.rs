@@ -8,18 +8,18 @@ use scrypt::{
     password_hash::{PasswordHasher, SaltString},
     Scrypt,
 };
-use serde::Deserialize;
-use serde_repr::Deserialize_repr;
+use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 /// AES-GCM encryption parameters
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct KeyParams {
     nonce: String,
     tag: String,
 }
 
 /// Master key decryption slot types supported by Aegis
-#[derive(Debug, Deserialize_repr, PartialEq)]
+#[derive(Debug, Deserialize_repr, Serialize_repr, PartialEq)]
 #[repr(u8)]
 enum SlotType {
     Raw = 0,
@@ -29,7 +29,7 @@ enum SlotType {
 
 /// Master key decryption slot. The master key is encrypted with a key derived from the password.
 /// The key derivation parameters are stored in the slot.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Slot {
     r#type: SlotType,
     // uuid: String,
@@ -44,7 +44,7 @@ struct Slot {
 }
 
 /// Database encryption header
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Header {
     /// List of master key decryption slots
     slots: Option<Vec<Slot>>,

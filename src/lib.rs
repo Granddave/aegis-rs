@@ -1,6 +1,6 @@
 use color_eyre::eyre::{eyre, Result};
 use dialoguer::{theme::ColorfulTheme, Password};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::io;
 use std::{env, fs, path::PathBuf};
 
@@ -17,7 +17,7 @@ mod crypto;
 pub mod totp;
 
 /// Database containing TOTP entries
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Database {
     /// Database version
     version: u32,
@@ -26,7 +26,7 @@ pub struct Database {
 }
 
 /// TOTP entry with information used to generate one time codes
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Entry {
     pub r#type: totp::EntryType,
     // pub uuid: String,
@@ -39,7 +39,7 @@ pub struct Entry {
 }
 
 /// Encrypted Aegis vault backup
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Vault {
     /// Backup version
     version: u32,
@@ -79,6 +79,11 @@ fn extract_database(vault: Vault) -> Result<Database> {
             vault.version
         )));
     }
+
+    // Dump database to file
+    // let db_dump = serde_json::to_string_pretty(&vault)?;
+    // let db_dump_filepath = PathBuf::from("/tmp/aegis-pass-dump.json");
+    // fs::write(db_dump_filepath, db_dump)?;
 
     if !vault.is_encrypted() {
         // Database in vault is in plaintext, just parse the JSON
