@@ -9,7 +9,6 @@ use scrypt::{
     Scrypt,
 };
 use serde::Deserialize;
-use serde_repr::Deserialize_repr;
 
 /// AES-GCM encryption parameters
 #[derive(Debug, Deserialize)]
@@ -18,29 +17,34 @@ struct KeyParams {
     tag: String,
 }
 
-/// Master key decryption slot types supported by Aegis
-#[derive(Debug, Deserialize_repr, PartialEq)]
-#[repr(u8)]
-enum SlotType {
-    Raw = 0,
-    Password = 1,
-    Biometric = 2,
+/// Password slot parameters (scrypt parameters + salt)
+#[derive(Debug, Deserialize)]
+struct PasswordSlot {
+    n: u32,
+    r: u32,
+    p: u32,
+    salt: String,
 }
 
-/// Master key decryption slot. The master key is encrypted with a key derived from the password.
-/// The key derivation parameters are stored in the slot.
+/// Master key decryption slot types supported by Aegis
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+enum SlotType {
+    #[serde(rename = "0")]
+    Raw,
+    #[serde(rename = "1")]
+    Password(PasswordSlot),
+    #[serde(rename = "2")]
+    Biometric,
+}
+
+/// Master key decryption slot
 #[derive(Debug, Deserialize)]
 struct Slot {
+    #[serde(flatten)]
     r#type: SlotType,
-    // uuid: String,
     key: String,
     key_params: KeyParams,
-    n: Option<i32>,
-    r: Option<i32>,
-    p: Option<i32>,
-    salt: Option<String>,
-    // repaired: Option<bool>,
-    // is_backup: Option<bool>,
 }
 
 /// Database encryption header
@@ -66,17 +70,13 @@ enum DecryptionError {
 }
 
 /// Derive master key from password
-fn derive_key(password: &[u8], slot: &Slot) -> Result<Output> {
-    let salt_hex = slot.salt.as_ref().ok_or(eyre!("Salt is unavailable"))?;
+fn derive_key(password: &[u8], slot: &PasswordSlot) -> Result<Output> {
     let salt_bytes =
-        Vec::from_hex(salt_hex).map_err(|e| eyre!("Failed to decode salt hex: {}", e))?;
+        Vec::from_hex(&slot.salt).map_err(|e| eyre!("Failed to decode salt hex: {}", e))?;
     let salt = SaltString::encode_b64(&salt_bytes)?;
 
-    let n = (slot.n.ok_or(eyre!("n parameter unavailable"))? as f32).log2() as u8;
-    let r = slot.r.ok_or(eyre!("r parameter unavailable"))? as u32;
-    let p = slot.p.ok_or(eyre!("p parameter unavailable"))? as u32;
-
-    let scrypt_params = scrypt::Params::new(n, r, p, 32)?;
+    let n = (slot.n as f32).log2() as u8;
+    let scrypt_params = scrypt::Params::new(n, slot.r, slot.p, 32)?;
     let derived_key =
         Scrypt.hash_password_customized(password, None, None, scrypt_params, &salt)?;
 
@@ -86,7 +86,15 @@ fn derive_key(password: &[u8], slot: &Slot) -> Result<Output> {
 }
 
 fn decrypt_master_key(password: &str, slot: &Slot) -> Result<Vec<u8>, DecryptionError> {
-    let derived_key = derive_key(password.as_bytes(), slot)
+    let password_slot = match &slot.r#type {
+        SlotType::Password(ps) => ps,
+        _ => {
+            return Err(DecryptionError::ParamError(
+                "Slot is not a password slot".to_string(),
+            ))
+        }
+    };
+    let derived_key = derive_key(password.as_bytes(), &password_slot)
         .map_err(|e| DecryptionError::ParamError(format!("Failed to derive key: {}", e)))?;
 
     let key_nonce = Vec::from_hex(&slot.key_params.nonce)
@@ -111,7 +119,7 @@ fn try_decrypt_master_key(password: &str, slots: &[Slot]) -> Result<Vec<u8>> {
     // Only password based master key decryptions are supported
     for slot in slots
         .iter()
-        .filter(|s| s.r#type == SlotType::Password)
+        .filter(|s| matches!(s.r#type, SlotType::Password(_)))
         .collect::<Vec<&Slot>>()
     {
         let master_key = match decrypt_master_key(password, slot) {
