@@ -94,7 +94,7 @@ fn decrypt_master_key(password: &str, slot: &Slot) -> Result<Vec<u8>, Decryption
             ))
         }
     };
-    let derived_key = derive_key(password.as_bytes(), &password_slot)
+    let derived_key = derive_key(password.as_bytes(), password_slot)
         .map_err(|e| DecryptionError::ParamError(format!("Failed to derive key: {}", e)))?;
 
     let key_nonce = Vec::from_hex(&slot.key_params.nonce)
