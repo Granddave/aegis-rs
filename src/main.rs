@@ -13,7 +13,7 @@ use std::{
 };
 
 use aegis_rs::{
-    totp::{calculate_remaining_time, generate_totp, EntryInfo},
+    otp::{calculate_remaining_time, generate_otp, EntryInfo},
     vault::{Entry, Vault},
 };
 
@@ -25,19 +25,19 @@ fn set_sigint_hook() {
     .expect("Setting SIGINT handler");
 }
 
-fn print_totp_every_second(entry_info: &EntryInfo) -> Result<()> {
+fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
     let term = Term::stdout();
     term.hide_cursor()?;
 
     let mut clipboard = arboard::Clipboard::new()?;
-    let mut totp_code = String::new();
+    let mut otp_code = String::new();
     let mut last_remaining_time = 0;
 
     loop {
         let remaining_time = calculate_remaining_time(entry_info)?;
         if last_remaining_time < remaining_time {
-            totp_code = generate_totp(entry_info)?;
-            clipboard.set_text(totp_code.clone())?;
+            otp_code = generate_otp(entry_info)?;
+            clipboard.set_text(otp_code.clone())?;
         }
 
         let style = match remaining_time {
@@ -47,7 +47,7 @@ fn print_totp_every_second(entry_info: &EntryInfo) -> Result<()> {
         };
         let line = style
             .bold()
-            .apply_to(format!("{} ({}s left)", totp_code, remaining_time));
+            .apply_to(format!("{} ({}s left)", otp_code, remaining_time));
         term.write_line(line.to_string().as_str())?;
         std::thread::sleep(Duration::from_secs(1));
         term.clear_last_lines(1)?;
@@ -85,17 +85,17 @@ fn main() -> Result<()> {
     let mut file_contents = String::new();
     file.read_to_string(&mut file_contents)?;
     let entries: Vec<Entry> = Vault::parse(&file_contents, get_password)?;
-    let totp_entries: Vec<&Entry> = entries
+    let entries: Vec<&Entry> = entries
         .iter()
         .filter(|e| matches!(e.info, EntryInfo::Totp(_)))
         .collect();
 
-    if totp_entries.is_empty() {
+    if entries.is_empty() {
         println!("Found no entries of the supported entry types (TOTP)");
         return Ok(());
     }
 
-    let items: Vec<String> = totp_entries
+    let items: Vec<String> = entries
         .iter()
         .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
         .collect();
@@ -106,8 +106,8 @@ fn main() -> Result<()> {
         .interact_opt()?;
     match selection {
         Some(index) => {
-            let totp_info = &totp_entries.get(index).unwrap().info;
-            print_totp_every_second(totp_info)?;
+            let entry_info = &entries.get(index).unwrap().info;
+            print_otp_every_second(entry_info)?;
         }
         None => {
             println!("No selection");

@@ -67,7 +67,7 @@ pub enum EntryInfo {
     Yandex(EntryInfoYandex),
 }
 
-pub fn generate_totp(entry_info: &EntryInfo) -> Result<String> {
+pub fn generate_otp(entry_info: &EntryInfo) -> Result<String> {
     let code = match entry_info {
         // TODO: Add full support for HOTP
         /*
