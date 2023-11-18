@@ -43,7 +43,8 @@ enum SlotType {
 #[derive(Debug, Deserialize)]
 struct Slot {
     #[serde(flatten)]
-    r#type: SlotType,
+    #[serde(rename = "type")]
+    slot_type: SlotType,
     key: String,
     key_params: KeyParams,
 }
@@ -79,7 +80,7 @@ fn derive_key(password: &[u8], slot: &PasswordSlot) -> Result<Output> {
 }
 
 fn decrypt_master_key(password: &str, slot: &Slot) -> Result<Vec<u8>, DecryptionError> {
-    let password_slot = match &slot.r#type {
+    let password_slot = match &slot.slot_type {
         SlotType::Password(ps) => ps,
         _ => {
             return Err(DecryptionError::ParamError(
@@ -112,7 +113,7 @@ fn try_decrypt_master_key(password: &str, slots: &[Slot]) -> Result<Vec<u8>> {
     // Only password based master key decryptions are supported
     for slot in slots
         .iter()
-        .filter(|s| matches!(s.r#type, SlotType::Password(_)))
+        .filter(|s| matches!(s.slot_type, SlotType::Password(_)))
         .collect::<Vec<&Slot>>()
     {
         let master_key = match decrypt_master_key(password, slot) {
@@ -134,17 +135,20 @@ fn try_decrypt_master_key(password: &str, slots: &[Slot]) -> Result<Vec<u8>> {
 }
 
 fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Result<Database> {
-    let db_nonce = Vec::from_hex(&params.nonce)?;
-    let db_tag = Vec::from_hex(&params.tag)?;
+    // Prepare database cipher
     let db_contents_cipher = general_purpose::STANDARD.decode(db)?;
-
-    let mut aes_context = Aes256Gcm::new(master_key.as_slice().into());
     let mut db_cipher: Vec<u8> = db_contents_cipher;
+    let db_tag = Vec::from_hex(&params.tag)?;
     db_cipher.extend_from_slice(&db_tag);
 
+    // Decrypt database
+    let mut aes_context = Aes256Gcm::new(master_key.as_slice().into());
+    let db_nonce = Vec::from_hex(&params.nonce)?;
     let db_contents = aes_context
         .decrypt(Nonce::from_slice(&db_nonce), db_cipher.as_ref())
         .map_err(|e| eyre!("Failed to decrypt database: {}", e))?;
+
+    // Parse database
     let db_contents_str = String::from_utf8(db_contents)?;
     let db: Database = serde_json::from_str(&db_contents_str)?;
 

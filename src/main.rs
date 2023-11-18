@@ -13,9 +13,8 @@ use std::{
 };
 
 use aegis_rs::{
-    totp::{calculate_remaining_time, generate_totp, EntryInfo, EntryType},
-    vault::Vault,
-    Entry,
+    totp::{calculate_remaining_time, generate_totp, EntryInfo},
+    vault::{Entry, Vault},
 };
 
 fn set_sigint_hook() {
@@ -26,7 +25,7 @@ fn set_sigint_hook() {
     .expect("Setting SIGINT handler");
 }
 
-fn print_totp_every_second(totp_info: &EntryInfo) -> Result<()> {
+fn print_totp_every_second(entry_info: &EntryInfo) -> Result<()> {
     let term = Term::stdout();
     term.hide_cursor()?;
 
@@ -35,9 +34,9 @@ fn print_totp_every_second(totp_info: &EntryInfo) -> Result<()> {
     let mut last_remaining_time = 0;
 
     loop {
-        let remaining_time = calculate_remaining_time(totp_info.period.ok_or(eyre!("No period"))?);
+        let remaining_time = calculate_remaining_time(entry_info)?;
         if last_remaining_time < remaining_time {
-            totp_code = generate_totp(totp_info)?;
+            totp_code = generate_totp(entry_info)?;
             clipboard.set_text(totp_code.clone())?;
         }
 
@@ -88,7 +87,7 @@ fn main() -> Result<()> {
     let entries: Vec<Entry> = Vault::parse(&file_contents, get_password)?;
     let totp_entries: Vec<&Entry> = entries
         .iter()
-        .filter(|e| e.r#type == EntryType::Totp)
+        .filter(|e| matches!(e.info, EntryInfo::Totp(_)))
         .collect();
 
     if totp_entries.is_empty() {

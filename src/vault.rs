@@ -1,7 +1,20 @@
 use color_eyre::eyre::{eyre, Result};
 use serde::Deserialize;
 
-use crate::{crypto, Entry};
+use crate::{crypto, totp};
+
+/// Entry with metadata and information used to generate one time codes
+#[derive(Debug, Deserialize)]
+pub struct Entry {
+    #[serde(flatten)]
+    pub info: totp::EntryInfo,
+    // pub uuid: String,
+    pub name: String,
+    pub issuer: String,
+    // pub note: String,
+    // pub favorite: bool,
+    // pub icon: String,
+}
 
 /// Database containing TOTP entries
 #[derive(Debug, Deserialize)]
