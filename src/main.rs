@@ -1,5 +1,3 @@
-extern crate serde_json;
-
 use color_eyre::eyre::{eyre, Result};
 use console::{Style, Term};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
@@ -13,8 +11,8 @@ use std::{
 };
 
 use aegis_rs::{
-    otp::{calculate_remaining_time, generate_otp, EntryInfo},
-    vault::{Entry, Vault},
+    otp::{calculate_remaining_time, generate_otp, Entry, EntryInfo},
+    vault::Vault,
 };
 
 fn set_sigint_hook() {

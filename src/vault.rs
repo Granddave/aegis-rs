@@ -3,26 +3,13 @@ use serde::Deserialize;
 
 use crate::{crypto, otp};
 
-/// Entry with metadata and information used to generate one time codes
-#[derive(Debug, Deserialize)]
-pub struct Entry {
-    #[serde(flatten)]
-    pub info: otp::EntryInfo,
-    // pub uuid: String,
-    pub name: String,
-    pub issuer: String,
-    // pub note: String,
-    // pub favorite: bool,
-    // pub icon: String,
-}
-
 /// Database containing OTP entries
 #[derive(Debug, Deserialize)]
 pub struct Database {
     /// Database version
     version: u32,
     /// List of OTP entries
-    pub entries: Vec<Entry>,
+    pub entries: Vec<otp::Entry>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,7 +37,7 @@ impl Vault {
     pub fn parse(
         vault_backup_contents: &str,
         password_fn: fn() -> Result<String>,
-    ) -> Result<Vec<Entry>> {
+    ) -> Result<Vec<otp::Entry>> {
         let vault: Vault = serde_json::from_str(vault_backup_contents)?;
         if vault.version != 1 {
             return Err(eyre!(format!(
