@@ -49,18 +49,10 @@ pub struct Vault {
     db: String,
 }
 
-impl Vault {
-    pub fn is_encrypted(&self) -> bool {
-        self.header.is_set()
-    }
-}
-
 /// Parse vault from JSON. A list of entries are returned.
 pub fn parse_aegis_vault(vault_backup_contents: &str) -> Result<Vec<Entry>> {
-    let db: Database = match serde_json::from_str(vault_backup_contents) {
-        Ok(vault) => extract_database(vault)?,
-        Err(_) => return Err(eyre!("Failed to parse vault file")),
-    };
+    let vault: Vault = serde_json::from_str(vault_backup_contents)?;
+    let db = extract_database(vault)?;
 
     if db.version != 2 {
         return Err(eyre!(format!(
@@ -80,18 +72,10 @@ fn extract_database(vault: Vault) -> Result<Database> {
         )));
     }
 
-    if !vault.is_encrypted() {
-        // Database in vault is in plaintext, just parse the JSON
-        return match serde_json::from_str(&vault.db) {
-            Ok(db) => Ok(db),
-            Err(_) => Err(eyre!("Failed to parse JSON")),
-        };
+    if vault.header.is_set() {
+        crypto::decrypt(get_password()?.as_str(), vault)
     } else {
-        // Database in vault is encrypted
-        let password = get_password()?;
-        let db = crypto::decrypt(password.as_str(), vault)?;
-
-        return Ok(db);
+        serde_json::from_str(&vault.db).map_err(|err| eyre!("Failed to parse database: {}", err))
     }
 }
 

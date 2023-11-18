@@ -159,15 +159,8 @@ fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Re
 }
 
 pub fn decrypt(password: &str, vault: Vault) -> Result<Database> {
-    let slots = vault
-        .header
-        .slots
-        .ok_or(eyre!("Vault header slots are unavailable"))?;
-    let params = vault
-        .header
-        .params
-        .ok_or(eyre!("Vault header parameters are unavailable"))?;
-
+    let slots = vault.header.slots.ok_or(eyre!("No slots in header"))?;
+    let params = vault.header.params.ok_or(eyre!("No params in header"))?;
     let master_key = try_decrypt_master_key(password, &slots)?;
 
     decrypt_database(&params, &master_key, &vault.db)
