@@ -1,14 +1,22 @@
 extern crate serde_json;
 
-use aegis_rs::{
-    parse_aegis_vault,
-    totp::{calculate_remaining_time, generate_totp, EntryInfo, EntryType},
-    Entry,
-};
 use color_eyre::eyre::{eyre, Result};
 use console::{Style, Term};
-use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-use std::{env, fs::File, io::Read, process::exit, time::Duration};
+use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
+use std::{
+    env,
+    fs::{self, File},
+    io::Read,
+    path::PathBuf,
+    process::exit,
+    time::Duration,
+};
+
+use aegis_rs::{
+    totp::{calculate_remaining_time, generate_totp, EntryInfo, EntryType},
+    vault::Vault,
+    Entry,
+};
 
 fn set_sigint_hook() {
     ctrlc::set_handler(move || {
@@ -48,6 +56,24 @@ fn print_totp_every_second(totp_info: &EntryInfo) -> Result<()> {
     }
 }
 
+/// Get password from user
+fn get_password() -> Result<String> {
+    // TODO: Refactor out password filepath
+    let home = env::var("HOME").expect("Failed to expand $HOME");
+    let password_filepath = PathBuf::from(home).join(".config/aegis-pass.txt");
+
+    if fs::metadata(&password_filepath).is_ok() {
+        println!("Found password file");
+        let password = fs::read_to_string(&password_filepath)?;
+        return Ok(password.trim().to_string());
+    } else {
+        return Password::with_theme(&ColorfulTheme::default())
+            .with_prompt("Insert Aegis Password")
+            .interact()
+            .map_err(|e| eyre!("Failed to get password: {}", e));
+    }
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
 
@@ -59,7 +85,7 @@ fn main() -> Result<()> {
     let mut file = File::open(filepath)?;
     let mut file_contents = String::new();
     file.read_to_string(&mut file_contents)?;
-    let entries: Vec<Entry> = parse_aegis_vault(&file_contents)?;
+    let entries: Vec<Entry> = Vault::parse(&file_contents, get_password)?;
     let totp_entries: Vec<&Entry> = entries
         .iter()
         .filter(|e| e.r#type == EntryType::Totp)

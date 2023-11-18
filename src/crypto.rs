@@ -1,4 +1,3 @@
-use super::{Database, Vault};
 use aes_gcm::{aead::AeadMut, Aes256Gcm, KeyInit, Nonce};
 use base64::{engine::general_purpose, Engine as _};
 use color_eyre::eyre::{eyre, Result};
@@ -9,6 +8,8 @@ use scrypt::{
     Scrypt,
 };
 use serde::Deserialize;
+
+use crate::vault::{Database, Vault, VaultDatabase};
 
 /// AES-GCM encryption parameters
 #[derive(Debug, Deserialize)]
@@ -156,7 +157,7 @@ pub fn decrypt(password: &str, vault: Vault) -> Result<Database> {
     let master_key = try_decrypt_master_key(password, &slots)?;
 
     let db = match vault.db {
-        crate::VaultDatabase::Encrypted(db) => db,
+        VaultDatabase::Encrypted(db) => db,
         _ => return Err(eyre!("Database in vault is not encrypted")),
     };
 
