@@ -56,14 +56,6 @@ pub struct Header {
     params: Option<KeyParams>,
 }
 
-impl Header {
-    /// The fields in the encryption header will not be set if the database in the vault is in
-    /// plain text.
-    pub fn is_set(&self) -> bool {
-        self.slots.is_some() && self.params.is_some()
-    }
-}
-
 enum DecryptionError {
     IncorrectPassword,
     ParamError(String),
@@ -163,5 +155,10 @@ pub fn decrypt(password: &str, vault: Vault) -> Result<Database> {
     let params = vault.header.params.ok_or(eyre!("No params in header"))?;
     let master_key = try_decrypt_master_key(password, &slots)?;
 
-    decrypt_database(&params, &master_key, &vault.db)
+    let db = match vault.db {
+        crate::VaultDatabase::Encrypted(db) => db,
+        _ => return Err(eyre!("Database in vault is not encrypted")),
+    };
+
+    decrypt_database(&params, &master_key, &db)
 }

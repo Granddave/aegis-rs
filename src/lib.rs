@@ -38,6 +38,15 @@ pub struct Entry {
     pub info: totp::EntryInfo,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum VaultDatabase {
+    /// Database in plain text
+    Plain(Database),
+    /// Base64 decoded AES265 encrypted JSON
+    Encrypted(String),
+}
+
 /// Encrypted Aegis vault backup
 #[derive(Debug, Deserialize)]
 pub struct Vault {
@@ -45,15 +54,22 @@ pub struct Vault {
     version: u32,
     /// Information to decrypt master key
     header: crypto::Header,
-    /// Base64 decoded AES265 encrypted JSON
-    db: String,
+    db: VaultDatabase,
 }
 
 /// Parse vault from JSON. A list of entries are returned.
 pub fn parse_aegis_vault(vault_backup_contents: &str) -> Result<Vec<Entry>> {
     let vault: Vault = serde_json::from_str(vault_backup_contents)?;
-    let db = extract_database(vault)?;
-
+    if vault.version != 1 {
+        return Err(eyre!(format!(
+            "Unsupported vault version: {}",
+            vault.version
+        )));
+    }
+    let db = match vault.db {
+        VaultDatabase::Plain(db) => Ok(db),
+        VaultDatabase::Encrypted(_) => crypto::decrypt(get_password()?.as_str(), vault),
+    }?;
     if db.version != 2 {
         return Err(eyre!(format!(
             "Unsupported database version: {}",
@@ -62,21 +78,6 @@ pub fn parse_aegis_vault(vault_backup_contents: &str) -> Result<Vec<Entry>> {
     }
 
     Ok(db.entries)
-}
-
-fn extract_database(vault: Vault) -> Result<Database> {
-    if vault.version != 1 {
-        return Err(eyre!(format!(
-            "Unsupported vault version: {}",
-            vault.version
-        )));
-    }
-
-    if vault.header.is_set() {
-        crypto::decrypt(get_password()?.as_str(), vault)
-    } else {
-        serde_json::from_str(&vault.db).map_err(|err| eyre!("Failed to parse database: {}", err))
-    }
 }
 
 /// Get password from user
