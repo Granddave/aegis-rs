@@ -31,31 +31,29 @@ pub struct Vault {
     pub db: VaultDatabase,
 }
 
-impl Vault {
-    /// Parse vault from JSON. A list of entries are returned.
-    /// password_fn is a function that returns the password used to decrypt the vault.
-    pub fn parse(
-        vault_backup_contents: &str,
-        password_fn: fn() -> Result<String>,
-    ) -> Result<Vec<otp::Entry>> {
-        let vault: Vault = serde_json::from_str(vault_backup_contents)?;
-        if vault.version != 1 {
-            return Err(eyre!(format!(
-                "Unsupported vault version: {}",
-                vault.version
-            )));
-        }
-        let db = match vault.db {
-            VaultDatabase::Plain(db) => Ok(db),
-            VaultDatabase::Encrypted(_) => crypto::decrypt(password_fn()?.as_str(), vault),
-        }?;
-        if db.version != 2 {
-            return Err(eyre!(format!(
-                "Unsupported database version: {}",
-                db.version
-            )));
-        }
-
-        Ok(db.entries)
+/// Parse vault from JSON. A list of entries are returned.
+/// password_fn is a function that returns the password used to decrypt the vault.
+pub fn parse(
+    vault_backup_contents: &str,
+    password_fn: fn() -> Result<String>,
+) -> Result<Vec<otp::Entry>> {
+    let vault: Vault = serde_json::from_str(vault_backup_contents)?;
+    if vault.version != 1 {
+        return Err(eyre!(format!(
+            "Unsupported vault version: {}",
+            vault.version
+        )));
     }
+    let db = match vault.db {
+        VaultDatabase::Plain(db) => Ok(db),
+        VaultDatabase::Encrypted(_) => crypto::decrypt(password_fn()?.as_str(), vault),
+    }?;
+    if db.version != 2 {
+        return Err(eyre!(format!(
+            "Unsupported database version: {}",
+            db.version
+        )));
+    }
+
+    Ok(db.entries)
 }

@@ -12,7 +12,7 @@ use std::{
 
 use aegis_rs::{
     otp::{calculate_remaining_time, generate_otp, Entry, EntryInfo},
-    vault::Vault,
+    vault::parse,
 };
 
 fn set_sigint_hook() {
@@ -82,7 +82,7 @@ fn main() -> Result<()> {
     let mut file = File::open(filepath)?;
     let mut file_contents = String::new();
     file.read_to_string(&mut file_contents)?;
-    let entries: Vec<Entry> = Vault::parse(&file_contents, get_password)?;
+    let entries: Vec<Entry> = parse(&file_contents, get_password)?;
     let entries: Vec<&Entry> = entries
         .iter()
         .filter(|e| matches!(e.info, EntryInfo::Totp(_)))
