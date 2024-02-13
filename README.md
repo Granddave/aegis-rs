@@ -36,3 +36,7 @@ This is a CLI tool for generating TOTP codes from a backup vault from [Aegis Aut
 - [ ] Display digits in groups
 - [x] Add TOTP to clipboard
 - [x] Add CI
+
+# License
+
+This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
