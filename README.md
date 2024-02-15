@@ -4,6 +4,16 @@
 
 This is a CLI tool for generating OTP codes from a backup vault from [Aegis Authenticator](https://github.com/beemdevelopment/Aegis).
 
+
+## Features
+
+- Decryption of the 256 bit AES-GSM encrypted vault
+- Fuzzy selection
+- TOTP generation (Currently just SHA1)
+- Time left indication
+- Clipboard support
+
+
 ## Getting Started with Aegis-rs
 
 ### Launching Aegis-rs with a Backup File
@@ -11,7 +21,7 @@ This is a CLI tool for generating OTP codes from a backup vault from [Aegis Auth
 To start Aegis-rs, simply pass the path to your backup file as an argument and enter password. For example:
 
 ```sh
-aegis-rs ~/Documents/aegis-backup-20230512-193110.json
+$ aegis-rs ~/Documents/aegis-backup-20230512-193110.json
 ```
 
 ### Searching for an Entry
@@ -34,15 +44,6 @@ Aegis-rs allows you to read the OTP directly in the terminal or paste it using t
 · Twitter (@johndoe)
 121921 (28s left)
 ```
-
-
-## Features
-
-- Decryption of the 256 bit AES-GSM encrypted vault
-- Fuzzy selection
-- TOTP generation (Currently just SHA1)
-- Time left indication
-- Clipboard support
 
 
 ### Ways to unlock the Vault
