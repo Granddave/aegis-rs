@@ -119,7 +119,8 @@ fn try_decrypt_master_key(password: &str, slots: &[Slot]) -> Result<Vec<u8>> {
         let master_key = match decrypt_master_key(password, slot) {
             Ok(key) => key,
             Err(DecryptionError::IncorrectPassword) => {
-                eprintln!("Incorrect password");
+                // Either the password is incorrect or the slot is not a password slot
+                // Let's try the next slot
                 continue;
             }
             Err(DecryptionError::ParamError(e)) => {
