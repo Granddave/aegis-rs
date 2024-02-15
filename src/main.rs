@@ -1,3 +1,4 @@
+use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
 use console::{Style, Term};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
@@ -5,15 +6,23 @@ use std::{
     env,
     fs::{self, File},
     io::Read,
-    path::PathBuf,
     process::exit,
     time::Duration,
 };
 
 use aegis_rs::{
     otp::{calculate_remaining_time, generate_otp, Entry, EntryInfo},
-    vault::parse,
+    vault::{parse_vault, PasswordGetter},
 };
+
+#[derive(Parser)]
+#[clap(name = "aegis-rs", about = "OTP generator for Aegis vaults")]
+struct Args {
+    #[clap(help = "Path to the vault file")]
+    vault: String,
+    #[clap(short, long, help = "Path to the password file")]
+    password_file: Option<String>,
+}
 
 fn set_sigint_hook() {
     ctrlc::set_handler(move || {
@@ -53,36 +62,46 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
     }
 }
 
-/// Get password from user
-fn get_password() -> Result<String> {
-    // TODO: Refactor out password filepath
-    let home = env::var("HOME").expect("Failed to expand $HOME");
-    let password_filepath = PathBuf::from(home).join(".config/aegis-pass.txt");
+struct PasswordInput {
+    password_file: Option<String>,
+}
 
-    if fs::metadata(&password_filepath).is_ok() {
-        println!("Found password file");
-        let password = fs::read_to_string(&password_filepath)?;
-        return Ok(password.trim().to_string());
-    } else {
-        return Password::with_theme(&ColorfulTheme::default())
-            .with_prompt("Insert Aegis Password")
-            .interact()
-            .map_err(|e| eyre!("Failed to get password: {}", e));
+impl PasswordInput {
+    fn read_password_from_file(&self, password_file: &str) -> Result<String> {
+        let password = fs::read_to_string(password_file)?;
+        Ok(password.trim().to_string())
+    }
+}
+
+impl PasswordGetter for PasswordInput {
+    fn get_password(&self) -> Result<String> {
+        if let Some(password_filepath) = &self.password_file {
+            return self.read_password_from_file(password_filepath);
+        } else if let Ok(password_file) = env::var("AEGIS_PASSWORD_FILE") {
+            return self.read_password_from_file(&password_file);
+        } else if let Ok(password) = env::var("AEGIS_PASSWORD") {
+            return Ok(password);
+        } else {
+            return Password::with_theme(&ColorfulTheme::default())
+                .with_prompt("Insert Aegis Password")
+                .interact()
+                .map_err(|e| eyre!("Failed to get password: {}", e));
+        }
     }
 }
 
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let args: Vec<String> = env::args().collect();
-    let filepath = match args.get(1) {
-        Some(fp) => fp,
-        None => return Err(eyre!("No filepath argument")),
+    let args = Args::parse();
+    let password_input = PasswordInput {
+        password_file: args.password_file,
     };
-    let mut file = File::open(filepath)?;
+
+    let mut file = File::open(args.vault)?;
     let mut file_contents = String::new();
     file.read_to_string(&mut file_contents)?;
-    let entries: Vec<Entry> = parse(&file_contents, get_password)?;
+    let entries: Vec<Entry> = parse_vault(&file_contents, password_input)?;
     let entries: Vec<&Entry> = entries
         .iter()
         .filter(|e| matches!(e.info, EntryInfo::Totp(_)))

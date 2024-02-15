@@ -21,6 +21,11 @@ pub enum VaultDatabase {
     Encrypted(String),
 }
 
+pub trait PasswordGetter {
+    /// Get the password from the user or from the environment
+    fn get_password(&self) -> Result<String>;
+}
+
 /// Encrypted Aegis vault backup
 #[derive(Debug, Deserialize)]
 pub struct Vault {
@@ -32,10 +37,9 @@ pub struct Vault {
 }
 
 /// Parse vault from JSON. A list of entries are returned.
-/// password_fn is a function that returns the password used to decrypt the vault.
-pub fn parse(
+pub fn parse_vault(
     vault_backup_contents: &str,
-    password_fn: fn() -> Result<String>,
+    password_getter: impl PasswordGetter,
 ) -> Result<Vec<otp::Entry>> {
     let vault: Vault = serde_json::from_str(vault_backup_contents)?;
     if vault.version != 1 {
@@ -46,7 +50,10 @@ pub fn parse(
     }
     let db = match vault.db {
         VaultDatabase::Plain(db) => Ok(db),
-        VaultDatabase::Encrypted(_) => crypto::decrypt(password_fn()?.as_str(), vault),
+        VaultDatabase::Encrypted(_) => {
+            let password = password_getter.get_password()?;
+            crypto::decrypt(&password, vault)
+        }
     }?;
     if db.version != 2 {
         return Err(eyre!(format!(
