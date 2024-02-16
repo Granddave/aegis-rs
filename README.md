@@ -2,7 +2,7 @@
 
 # Aegis 2FA Authenticator CLI
 
-This is a CLI tool for generating OTP codes from a backup vault from [Aegis Authenticator](https://github.com/beemdevelopment/Aegis).
+This is a CLI tool for generating OTP codes from a backup vault from the Android app [Aegis Authenticator](https://github.com/beemdevelopment/Aegis).
 
 
 ## Features
@@ -52,7 +52,7 @@ To unlock the Aegis vault `aegis-rs` supports the following methods:
 
 1. CLI flag: `-p PASSWORD_FILE_PATH` or `--password-path PASSWORD_FILE_PATH`
 2. Environment variable to specify password file: `AEGIS_PASSWORD_FILE=~/.config/aegis-pass.txt`
-3. Environment variable to specify password: `AEGIS_PASSWORD_FILE=hunter2`
+3. Environment variable to specify password: `AEGIS_PASSWORD=hunter2`
 4. Interactive prompt if none of the above is provided
 
 
