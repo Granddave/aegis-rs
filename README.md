@@ -16,6 +16,14 @@ This is a CLI tool for generating OTP codes from a backup vault from the Android
 
 ## Getting Started with Aegis-rs
 
+### Installation
+
+The easiest way to install Aegis-rs is by using `cargo`:
+
+```sh
+$ cargo install --git https://github.com/Granddave/aegis-rs
+```
+
 ### Launching Aegis-rs with a Backup File
 
 To start Aegis-rs, simply pass the path to your backup file as an argument and enter password. For example:
@@ -48,7 +56,7 @@ Aegis-rs allows you to read the OTP directly in the terminal or paste it using t
 
 ### Ways to unlock the Vault
 
-To unlock the Aegis vault `aegis-rs` supports the following methods:
+To unlock the Aegis vault Aegis-rs supports the following methods:
 
 1. CLI flag: `-p PASSWORD_FILE_PATH` or `--password-path PASSWORD_FILE_PATH`
 2. Environment variable to specify password file: `AEGIS_PASSWORD_FILE=~/.config/aegis-pass.txt`
