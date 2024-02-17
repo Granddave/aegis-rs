@@ -7,11 +7,11 @@ This is a CLI tool for generating OTP codes from a backup vault from the Android
 
 ## Features
 
-- Decryption of the 256 bit AES-GSM encrypted vault
-- Fuzzy selection
-- TOTP generation (Currently just SHA1)
-- Time left indication
-- Clipboard support
+- Decryption of the 256 bit AES-GSM encrypted vault 🔓
+- Fuzzy selection 🔍
+- TOTP generation 🕒
+- Time left indication ⏳
+- Clipboard support 📋
 
 
 ## Getting Started with Aegis-rs
@@ -30,6 +30,7 @@ To start Aegis-rs, simply pass the path to your backup file as an argument and e
 
 ```sh
 $ aegis-rs ~/Documents/aegis-backup-20230512-193110.json
+? Insert Aegis Password › ********
 ```
 
 ### Searching for an Entry
