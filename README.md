@@ -78,7 +78,7 @@ To unlock the Aegis vault Aegis-rs supports the following methods:
     - [ ] HOTP
     - [ ] Steam
     - [ ] Yandex
-- [ ] Support unencrypted vaults
+- [x] Support unencrypted vaults
 - [ ] Display digits in groups
 - [x] Add TOTP to clipboard
 - [x] Add CI
