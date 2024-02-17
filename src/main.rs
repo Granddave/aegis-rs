@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{crate_version, Parser};
 use color_eyre::eyre::{eyre, Result};
 use console::{Style, Term};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
@@ -16,7 +16,11 @@ use aegis_rs::{
 };
 
 #[derive(Parser)]
-#[clap(name = "aegis-rs", about = "OTP generator for Aegis vaults")]
+#[clap(
+    name = "aegis",
+    about = "OTP generator for Aegis vaults",
+    version = crate_version!()
+)]
 struct Args {
     #[clap(help = "Path to the vault file")]
     vault: String,
