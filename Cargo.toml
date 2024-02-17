@@ -7,7 +7,7 @@ edition = "2021"
 aes-gcm = "0.10.2"
 arboard = "3.2.1"
 base64 = "0.21.2"
-clap = { version = "4.5.0", features = ["derive", "cargo"] }
+clap = { version = "4.5.0", features = ["derive", "cargo", "env"] }
 color-eyre = "0.6"
 console = "0.15.7"
 ctrlc = "3.4.0"

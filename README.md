@@ -58,10 +58,13 @@ Aegis-rs allows you to read the OTP directly in the terminal or paste it using t
 
 To unlock the Aegis vault Aegis-rs supports the following methods:
 
-1. CLI flag: `-p PASSWORD_FILE_PATH` or `--password-path PASSWORD_FILE_PATH`
-2. Environment variable to specify password file: `AEGIS_PASSWORD_FILE=~/.config/aegis-pass.txt`
-3. Environment variable to specify password: `AEGIS_PASSWORD=hunter2`
-4. Interactive prompt if none of the above is provided
+1. Password: The password can be passed as an argument or set as an environment variable.
+    - Environment variable: `AEGIS_PASSWORD`
+    - Argument: `--password <PASSWORD>`
+2. Password file: A file containing the password to unlock the vault.
+    - Environment variable: `AEGIS_PASSWORD_FILE`
+    - Argument: `--password-file <PASSWORD_FILE>`
+3. Password prompt: If no password is provided, Aegis-rs will prompt you to enter the password.
 
 
 ## TODO

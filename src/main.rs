@@ -2,13 +2,7 @@ use clap::{crate_version, Parser};
 use color_eyre::eyre::{eyre, Result};
 use console::{Style, Term};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
-use std::{
-    env,
-    fs::{self, File},
-    io::Read,
-    process::exit,
-    time::Duration,
-};
+use std::{env, fs, path::PathBuf, process::exit, time::Duration};
 
 use aegis_rs::{
     otp::{calculate_remaining_time, generate_otp, Entry, EntryInfo},
@@ -17,15 +11,49 @@ use aegis_rs::{
 
 #[derive(Parser)]
 #[clap(
-    name = "aegis",
+    name = "aegis-rs",
     about = "OTP generator for Aegis vaults",
     version = crate_version!()
 )]
 struct Args {
-    #[clap(help = "Path to the vault file")]
-    vault: String,
-    #[clap(short, long, help = "Path to the password file")]
-    password_file: Option<String>,
+    #[clap(help = "Path to the vault file", env = "AEGIS_VAULT_FILE")]
+    vault_file: PathBuf,
+    #[clap(flatten)]
+    password_input: PasswordInput,
+}
+
+#[derive(Parser)]
+struct PasswordInput {
+    #[clap(
+        short,
+        long,
+        env = "AEGIS_PASSWORD_FILE",
+        help = "Path to the password file"
+    )]
+    password_file: Option<PathBuf>,
+    #[clap(
+        long,
+        env = "AEGIS_PASSWORD",
+        help = "Password to unlock vault",
+        conflicts_with = "password_file"
+    )]
+    password: Option<String>,
+}
+
+impl PasswordGetter for PasswordInput {
+    fn get_password(&self) -> Result<String> {
+        match (&self.password, &self.password_file) {
+            (Some(password), None) => Ok(password.clone()),
+            (None, Some(password_file)) => {
+                let password = fs::read_to_string(password_file)?;
+                Ok(password.trim().to_string())
+            }
+            _ => Password::with_theme(&ColorfulTheme::default())
+                .with_prompt("Insert Aegis Password")
+                .interact()
+                .map_err(|e| eyre!("Failed to get password: {}", e)),
+        }
+    }
 }
 
 fn set_sigint_hook() {
@@ -66,46 +94,13 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
     }
 }
 
-struct PasswordInput {
-    password_file: Option<String>,
-}
-
-impl PasswordInput {
-    fn read_password_from_file(&self, password_file: &str) -> Result<String> {
-        let password = fs::read_to_string(password_file)?;
-        Ok(password.trim().to_string())
-    }
-}
-
-impl PasswordGetter for PasswordInput {
-    fn get_password(&self) -> Result<String> {
-        if let Some(password_filepath) = &self.password_file {
-            return self.read_password_from_file(password_filepath);
-        } else if let Ok(password_file) = env::var("AEGIS_PASSWORD_FILE") {
-            return self.read_password_from_file(&password_file);
-        } else if let Ok(password) = env::var("AEGIS_PASSWORD") {
-            return Ok(password);
-        } else {
-            return Password::with_theme(&ColorfulTheme::default())
-                .with_prompt("Insert Aegis Password")
-                .interact()
-                .map_err(|e| eyre!("Failed to get password: {}", e));
-        }
-    }
-}
-
 fn main() -> Result<()> {
     color_eyre::install()?;
 
     let args = Args::parse();
-    let password_input = PasswordInput {
-        password_file: args.password_file,
-    };
 
-    let mut file = File::open(args.vault)?;
-    let mut file_contents = String::new();
-    file.read_to_string(&mut file_contents)?;
-    let entries: Vec<Entry> = parse_vault(&file_contents, password_input)?;
+    let file_contents = fs::read_to_string(&args.vault_file)?;
+    let entries = parse_vault(&file_contents, args.password_input)?;
     let entries: Vec<&Entry> = entries
         .iter()
         .filter(|e| matches!(e.info, EntryInfo::Totp(_)))
