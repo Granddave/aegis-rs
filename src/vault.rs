@@ -1,7 +1,13 @@
 use color_eyre::eyre::{eyre, Result};
 use serde::Deserialize;
 
-use crate::{crypto, otp};
+use crate::otp;
+
+/// Cryptographic functions and data structures used to decrypt database with OTP entries
+///
+/// The official Aegis documentation for vault decryption and contents can be found
+/// [here](https://github.com/beemdevelopment/Aegis/blob/master/docs/vault.md#aegis-vault).
+mod crypto;
 
 /// Database containing OTP entries
 #[derive(Debug, Deserialize)]
@@ -12,6 +18,7 @@ pub struct Database {
     pub entries: Vec<otp::Entry>,
 }
 
+/// Vault database as found in the JSON file
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum VaultDatabase {
@@ -26,7 +33,7 @@ pub trait PasswordGetter {
     fn get_password(&self) -> Result<String>;
 }
 
-/// Encrypted Aegis vault backup
+/// Aegis vault backup
 #[derive(Debug, Deserialize)]
 pub struct Vault {
     /// Backup version

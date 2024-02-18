@@ -81,7 +81,7 @@ fn derive_key(password: &[u8], slot: &PasswordSlot) -> Result<Output> {
 
 fn decrypt_master_key(password: &str, slot: &Slot) -> Result<Vec<u8>, DecryptionError> {
     let password_slot = match &slot.slot_type {
-        SlotType::Password(ps) => ps,
+        SlotType::Password(slot) => slot,
         _ => {
             return Err(DecryptionError::ParamError(
                 "Slot is not a password slot".to_string(),
@@ -135,9 +135,21 @@ fn try_decrypt_master_key(password: &str, slots: &[Slot]) -> Result<Vec<u8>> {
     Err(eyre!("Failed to decrypt master key"))
 }
 
-fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Result<Database> {
+/// Use decrypted master key to decrypt database
+///
+/// # Arguments
+/// * `params` - Database encryption parameters
+/// * `master_key` - Decrypted master key
+/// * `encrypted_db` - AES-GCM encrypted database in base64
+/// # Returns
+/// * Decrypted database
+fn decrypt_database(
+    params: &KeyParams,
+    master_key: &Vec<u8>,
+    encrypted_db: &str,
+) -> Result<Database> {
     // Prepare database cipher
-    let db_contents_cipher = general_purpose::STANDARD.decode(db)?;
+    let db_contents_cipher = general_purpose::STANDARD.decode(encrypted_db)?;
     let mut db_cipher: Vec<u8> = db_contents_cipher;
     let db_tag = Vec::from_hex(&params.tag)?;
     db_cipher.extend_from_slice(&db_tag);
@@ -149,7 +161,7 @@ fn decrypt_database(params: &KeyParams, master_key: &Vec<u8>, db: &String) -> Re
         .decrypt(Nonce::from_slice(&db_nonce), db_cipher.as_ref())
         .map_err(|e| eyre!("Failed to decrypt database: {}", e))?;
 
-    // Parse database
+    // Parse database from string
     let db_contents_str = String::from_utf8(db_contents)?;
     let db: Database = serde_json::from_str(&db_contents_str)?;
 
@@ -161,10 +173,10 @@ pub fn decrypt(password: &str, vault: Vault) -> Result<Database> {
     let params = vault.header.params.ok_or(eyre!("No params in header"))?;
     let master_key = try_decrypt_master_key(password, &slots)?;
 
-    let db = match vault.db {
+    let encrypted_db = match vault.db {
         VaultDatabase::Encrypted(db) => db,
         _ => return Err(eyre!("Database in vault is not encrypted")),
     };
 
-    decrypt_database(&params, &master_key, &db)
+    decrypt_database(&params, &master_key, &encrypted_db)
 }
