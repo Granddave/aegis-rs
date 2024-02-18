@@ -3,6 +3,10 @@ name = "aegis-rs"
 version = "0.2.0"
 edition = "2021"
 
+[[bin]]
+name = "aegis-rs"
+path = "src/bin/cli.rs"
+
 [dependencies]
 aes-gcm = "0.10.2"
 arboard = "3.2.1"
