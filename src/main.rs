@@ -99,8 +99,20 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let file_contents = fs::read_to_string(&args.vault_file)?;
-    let entries = parse_vault(&file_contents, args.password_input)?;
+    let file_contents = match fs::read_to_string(&args.vault_file) {
+        Ok(contents) => contents,
+        Err(e) => {
+            eprintln!("Failed to read vault file: {}", e);
+            exit(1);
+        }
+    };
+    let entries = match parse_vault(&file_contents, args.password_input) {
+        Ok(entries) => entries,
+        Err(e) => {
+            eprintln!("Failed to open vault: {}", e);
+            exit(1);
+        }
+    };
     let entries: Vec<&Entry> = entries
         .iter()
         .filter(|e| matches!(e.info, EntryInfo::Totp(_)))
