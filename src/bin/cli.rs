@@ -68,7 +68,7 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
     let term = Term::stdout();
     term.hide_cursor()?;
 
-    let mut clipboard = arboard::Clipboard::new()?;
+    let mut clipboard = arboard::Clipboard::new().ok();
     let mut otp_code = String::new();
     let mut last_remaining_time = 0;
 
@@ -76,7 +76,9 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
         let remaining_time = calculate_remaining_time(entry_info)?;
         if last_remaining_time < remaining_time {
             otp_code = generate_otp(entry_info)?;
-            clipboard.set_text(otp_code.clone())?;
+            if let Some(clipboard) = clipboard.as_mut() {
+                clipboard.set_text(otp_code.clone())?;
+            }
         }
 
         let style = match remaining_time {
