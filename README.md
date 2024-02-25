@@ -62,9 +62,11 @@ To unlock the Aegis vault Aegis-rs supports the following methods:
 1. Password: The password can be passed as an argument or set as an environment variable.
     - Environment variable: `AEGIS_PASSWORD`
     - Argument: `--password <PASSWORD>`
+    - Example: `aegis-rs --password hunter2 vault.json`
 2. Password file: A file containing the password to unlock the vault.
     - Environment variable: `AEGIS_PASSWORD_FILE`
     - Argument: `--password-file <PASSWORD_FILE>`
+    - Example: `aegis-rs --password-file /path/to/password-file vault.json`
 3. Password prompt: If no password is provided, Aegis-rs will prompt you to enter the password.
 
 
