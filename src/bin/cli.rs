@@ -39,7 +39,8 @@ struct PasswordInput {
         long,
         env = "AEGIS_PASSWORD",
         help = "Password to unlock vault",
-        conflicts_with = "password_file"
+        conflicts_with = "password_file",
+        hide_env_values = true
     )]
     password: Option<String>,
 }
