@@ -1,4 +1,4 @@
-use clap::{crate_version, Parser};
+use clap::{crate_version, Args, Parser};
 use color_eyre::eyre::{eyre, Result};
 use console::{Style, Term};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
@@ -15,14 +15,18 @@ use aegis_rs::{
     about = "OTP generator for Aegis vaults",
     version = crate_version!()
 )]
-struct Args {
+struct Cli {
     #[clap(help = "Path to the vault file", env = "AEGIS_VAULT_FILE")]
     vault_file: PathBuf,
     #[clap(flatten)]
     password_input: PasswordInput,
+    #[clap(flatten, help = "Filter by issuer name")]
+    entry_filter: EntryFilter,
+    #[clap(long, help = "Print to stdout in JSON")]
+    json: bool,
 }
 
-#[derive(Parser)]
+#[derive(Args)]
 struct PasswordInput {
     #[clap(
         short,
@@ -38,6 +42,30 @@ struct PasswordInput {
         conflicts_with = "password_file"
     )]
     password: Option<String>,
+}
+
+#[derive(Args)]
+struct EntryFilter {
+    #[clap(long, help = "Filter by entry issuer")]
+    issuer: Option<String>,
+    #[clap(long, help = "Filter by entry name")]
+    name: Option<String>,
+}
+
+impl EntryFilter {
+    fn matches(&self, entry: &Entry) -> bool {
+        if let Some(issuer) = &self.issuer {
+            if !entry.issuer.to_lowercase().contains(&issuer.to_lowercase()) {
+                return false;
+            }
+        }
+        if let Some(name) = &self.name {
+            if !entry.name.to_lowercase().contains(&name.to_lowercase()) {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 impl PasswordGetter for PasswordInput {
@@ -99,7 +127,7 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let args = Args::parse();
+    let args = Cli::parse();
 
     let file_contents = match fs::read_to_string(&args.vault_file) {
         Ok(contents) => contents,
@@ -109,19 +137,20 @@ fn main() -> Result<()> {
         }
     };
     let entries = match parse_vault(&file_contents, args.password_input) {
-        Ok(entries) => entries,
+        Ok(entries) => entries
+            .into_iter()
+            // Only TOTP entries are supported at the moment remove this filter later
+            .filter(|e| matches!(e.info, EntryInfo::Totp(_)))
+            .filter(|e| args.entry_filter.matches(e))
+            .collect::<Vec<Entry>>(),
         Err(e) => {
             eprintln!("Failed to open vault: {}", e);
             exit(1);
         }
     };
-    let entries: Vec<&Entry> = entries
-        .iter()
-        .filter(|e| matches!(e.info, EntryInfo::Totp(_)))
-        .collect();
 
     if entries.is_empty() {
-        println!("Found no entries of the supported entry types (TOTP)");
+        println!("Found no matching entries based on filters and supported vault entries");
         return Ok(());
     }
 
