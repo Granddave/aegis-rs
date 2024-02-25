@@ -12,6 +12,7 @@ This is a CLI tool for generating OTP codes from a backup vault from the Android
 - TOTP generation 🕒
 - Time left indication ⏳
 - Clipboard support 📋
+- JSON output to stdout 📜
 
 
 ## Getting Started with Aegis-rs
@@ -68,6 +69,13 @@ To unlock the Aegis vault Aegis-rs supports the following methods:
     - Argument: `--password-file <PASSWORD_FILE>`
     - Example: `aegis-rs --password-file /path/to/password-file vault.json`
 3. Password prompt: If no password is provided, Aegis-rs will prompt you to enter the password.
+
+
+### Extra flags
+
+- `--issuer <ISSUER>`: Filter entries by entry issuer.
+- `--name <NAME>`: Filter entries by entry name.
+- `--json`: Output the calculated OTPs as JSON.
 
 
 ## TODO
