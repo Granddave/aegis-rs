@@ -68,6 +68,14 @@ impl EntryFilter {
     }
 }
 
+#[derive(Debug, serde::Serialize)]
+struct CalculatedOtp {
+    issuer: String,
+    name: String,
+    otp: String,
+    remaining_time: i32,
+}
+
 impl PasswordGetter for PasswordInput {
     fn get_password(&self) -> Result<String> {
         match (&self.password, &self.password_file) {
@@ -124,6 +132,48 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
     }
 }
 
+fn entries_to_json(entries: &[Entry]) -> Result<()> {
+    let output: Vec<CalculatedOtp> = entries
+        .iter()
+        .map(|entry| {
+            Ok(CalculatedOtp {
+                issuer: entry.issuer.clone(),
+                name: entry.name.clone(),
+                otp: generate_otp(&entry.info)?,
+                remaining_time: calculate_remaining_time(&entry.info)?,
+            })
+        })
+        .collect::<Result<Vec<CalculatedOtp>>>()?;
+    if output.is_empty() {
+        println!("No entries found");
+    } else {
+        println!("{}", serde_json::to_string_pretty(&output)?);
+    }
+    Ok(())
+}
+
+fn fuzzy_select(entries: &[Entry]) -> Result<()> {
+    let items: Vec<String> = entries
+        .iter()
+        .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
+        .collect();
+    set_sigint_hook();
+    let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
+        .items(&items)
+        .default(0)
+        .interact_opt()?;
+    match selection {
+        Some(index) => {
+            let entry_info = &entries.get(index).unwrap().info;
+            print_otp_every_second(entry_info)?;
+        }
+        None => {
+            println!("No selection");
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
 
@@ -154,23 +204,10 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let items: Vec<String> = entries
-        .iter()
-        .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
-        .collect();
-    set_sigint_hook();
-    let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
-        .items(&items)
-        .default(0)
-        .interact_opt()?;
-    match selection {
-        Some(index) => {
-            let entry_info = &entries.get(index).unwrap().info;
-            print_otp_every_second(entry_info)?;
-        }
-        None => {
-            println!("No selection");
-        }
+    if args.json {
+        entries_to_json(&entries)?;
+    } else {
+        fuzzy_select(&entries)?;
     }
 
     Ok(())
