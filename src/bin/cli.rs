@@ -95,7 +95,7 @@ impl PasswordGetter for PasswordInput {
 
 fn set_sigint_hook() {
     ctrlc::set_handler(move || {
-        Term::stdout().show_cursor().expect("Shwoing cursor");
+        Term::stdout().show_cursor().expect("Showing cursor");
         exit(0);
     })
     .expect("Setting SIGINT handler");
