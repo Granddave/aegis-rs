@@ -22,7 +22,7 @@ This is a CLI tool for generating OTP codes from a backup vault from the Android
 The easiest way to install Aegis-rs is by using `cargo`:
 
 ```sh
-$ cargo install --git https://github.com/Granddave/aegis-rs
+$ cargo install --git https://github.com/Granddave/aegis-rs --tag latest
 ```
 
 ### Launching Aegis-rs with a Backup File
