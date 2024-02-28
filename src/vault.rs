@@ -13,12 +13,12 @@ mod crypto;
 #[derive(Debug, Deserialize)]
 pub struct Database {
     /// Database version
-    version: u32,
+    pub version: u32,
     /// List of OTP entries
     pub entries: Vec<otp::Entry>,
 }
 
-/// Vault database as found in the JSON file
+/// Vault database as found in the JSON vault backup file
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum VaultDatabase {
@@ -40,14 +40,22 @@ pub struct Vault {
     pub version: u32,
     /// Information to decrypt master key
     pub header: crypto::Header,
+    /// Entry database in plain text or encrypted
     pub db: VaultDatabase,
 }
 
-/// Parse vault from JSON. A list of entries are returned.
+/// Parse vault from JSON as found in the vault backup file
+///
+/// # Arguments
+/// * `vault_backup_contents` - JSON string containing vault backup, encrypted or not
+/// * `password_getter` - Password getter implementation
+///
+/// # Returns
+/// * `Result` containing the parsed database
 pub fn parse_vault(
     vault_backup_contents: &str,
     password_getter: impl PasswordGetter,
-) -> Result<Vec<otp::Entry>> {
+) -> Result<Database> {
     let vault: Vault = serde_json::from_str(vault_backup_contents)?;
     if vault.version != 1 {
         return Err(eyre!(format!(
@@ -56,12 +64,14 @@ pub fn parse_vault(
         )));
     }
     let db = match vault.db {
-        VaultDatabase::Plain(db) => Ok(db),
+        VaultDatabase::Plain(db) => db,
         VaultDatabase::Encrypted(_) => {
             let password = password_getter.get_password()?;
-            crypto::decrypt(&password, vault)
+            let json = crypto::decrypt_database(&password, vault)?;
+            let db: Database = serde_json::from_str(&json)?;
+            db
         }
-    }?;
+    };
     if db.version != 2 {
         return Err(eyre!(format!(
             "Unsupported database version: {}",
@@ -69,5 +79,5 @@ pub fn parse_vault(
         )));
     }
 
-    Ok(db.entries)
+    Ok(db)
 }

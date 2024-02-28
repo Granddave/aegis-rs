@@ -188,7 +188,8 @@ fn main() -> Result<()> {
         }
     };
     let entries = match parse_vault(&file_contents, args.password_input) {
-        Ok(entries) => entries
+        Ok(db) => db
+            .entries
             .into_iter()
             // Only TOTP entries are supported at the moment remove this filter later
             .filter(|e| matches!(e.info, EntryInfo::Totp(_)))

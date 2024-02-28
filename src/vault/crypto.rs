@@ -9,7 +9,7 @@ use scrypt::{
 };
 use serde::Deserialize;
 
-use crate::vault::{Database, Vault, VaultDatabase};
+use crate::vault::{Vault, VaultDatabase};
 
 /// AES-GCM encryption parameters
 #[derive(Debug, Deserialize)]
@@ -135,48 +135,52 @@ fn try_decrypt_master_key(password: &str, slots: &[Slot]) -> Result<Vec<u8>> {
     Err(eyre!("Failed to decrypt master key"))
 }
 
-/// Use decrypted master key to decrypt database
+/// Decrypt vault database from HEX encoded AES-GCM encrypted JSON to plain JSON
 ///
 /// # Arguments
-/// * `params` - Database encryption parameters
-/// * `master_key` - Decrypted master key
-/// * `encrypted_db` - AES-GCM encrypted database in base64
+/// * `password` - Password to decrypt the vault
+/// * `vault` - Vault to decrypt
+///
 /// # Returns
-/// * Decrypted database
-fn decrypt_database(
-    params: &KeyParams,
-    master_key: &Vec<u8>,
-    encrypted_db: &str,
-) -> Result<Database> {
-    // Prepare database cipher
+/// * `Result` containing the decrypted database in JSON
+pub fn decrypt_database(password: &str, vault: Vault) -> Result<String> {
+    let slots = vault.header.slots.ok_or(eyre!("No slots in header"))?;
+    let params = vault.header.params.ok_or(eyre!("No params in header"))?;
+    let encrypted_db = match vault.db {
+        VaultDatabase::Encrypted(db) => db,
+        _ => return Err(eyre!("Database in vault is not encrypted")),
+    };
+
+    // Decrypt master key
+    let master_key = try_decrypt_master_key(password, &slots)?;
+
+    // Decode base64 and append tag
     let db_contents_cipher = general_purpose::STANDARD.decode(encrypted_db)?;
     let mut db_cipher: Vec<u8> = db_contents_cipher;
-    let db_tag = Vec::from_hex(&params.tag)?;
-    db_cipher.extend_from_slice(&db_tag);
+    db_cipher.extend_from_slice(&Vec::from_hex(&params.tag)?);
 
-    // Decrypt database
+    // Decrypt database with master key
     let mut aes_context = Aes256Gcm::new(master_key.as_slice().into());
     let db_nonce = Vec::from_hex(&params.nonce)?;
     let db_contents = aes_context
         .decrypt(Nonce::from_slice(&db_nonce), db_cipher.as_ref())
         .map_err(|e| eyre!("Failed to decrypt database: {}", e))?;
 
-    // Parse database from string
-    let db_contents_str = String::from_utf8(db_contents)?;
-    let db: Database = serde_json::from_str(&db_contents_str)?;
+    // Parse database as UTF-8 JSON
+    let db_str = String::from_utf8(db_contents)
+        .map_err(|e| eyre!("Failed to parse database as UTF-8: {}", e))?;
 
-    Ok(db)
+    Ok(db_str)
 }
 
-pub fn decrypt(password: &str, vault: Vault) -> Result<Database> {
-    let slots = vault.header.slots.ok_or(eyre!("No slots in header"))?;
-    let params = vault.header.params.ok_or(eyre!("No params in header"))?;
-    let master_key = try_decrypt_master_key(password, &slots)?;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let encrypted_db = match vault.db {
-        VaultDatabase::Encrypted(db) => db,
-        _ => return Err(eyre!("Database in vault is not encrypted")),
-    };
-
-    decrypt_database(&params, &master_key, &encrypted_db)
+    #[test]
+    fn test_decrypt_database() {
+        let vault_str = include_str!("../../res/aegis_encrypted.json");
+        let vault: Vault = serde_json::from_str(vault_str).expect("Failed to parse vault");
+        let _decrypted = decrypt_database("test", vault).expect("Failed to decrypt database");
+    }
 }
