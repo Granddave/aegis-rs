@@ -7,7 +7,7 @@ This is a CLI tool for generating OTP codes from a backup vault from the Android
 
 ## Features
 
-- Decryption of the 256 bit AES-GSM encrypted vault 🔓
+- Decryption of the 256 bit AES-GCM encrypted vault 🔓
 - Fuzzy selection 🔍
 - TOTP generation 🕒
 - Time left indication ⏳
