@@ -80,7 +80,32 @@ pub struct Entry {
     // pub icon: String,
 }
 
+/// Returns the current time since the UNIX epoch in seconds
+fn time_since_epoch() -> i32 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs() as i32
+}
+
+/// Generates a one time password based on the entry information
+/// and the current time
+///
+/// # Arguments
+/// * `entry_info` - The information used to generate the OTP
+/// * `time_since_epoch` - The time since the UNIX epoch in seconds
+///
+/// # Returns
+/// The generated one time password
+///
+/// # Errors
+/// Returns an error if the entry type is not implemented
+/// or if the entry information is invalid
 pub fn generate_otp(entry_info: &EntryInfo) -> Result<String> {
+    generate_otp_impl(entry_info, time_since_epoch())
+}
+
+fn generate_otp_impl(entry_info: &EntryInfo, time_since_epoch: i32) -> Result<String> {
     let code = match entry_info {
         // TODO: Add full support for HOTP
         /*
@@ -93,6 +118,7 @@ pub fn generate_otp(entry_info: &EntryInfo) -> Result<String> {
             .generate(),
         */
         EntryInfo::Totp(info) => TOTPBuilder::new()
+            .timestamp(time_since_epoch as i64)
             .base32_key(&info.secret.to_string())
             .hash_function(info.algo.into())
             .output_len(info.digits.try_into()?)
@@ -105,25 +131,63 @@ pub fn generate_otp(entry_info: &EntryInfo) -> Result<String> {
     Ok(code)
 }
 
+/// Calculates the remaining time until the next period starts
 pub fn calculate_remaining_time(entry_info: &EntryInfo) -> Result<i32> {
+    calculate_remaining_time_impl(entry_info, time_since_epoch())
+}
+
+fn calculate_remaining_time_impl(entry_info: &EntryInfo, seconds_since_epoch: i32) -> Result<i32> {
     let period_length_s = match entry_info {
         EntryInfo::Totp(info) => info.period,
         _ => return Err(eyre!("Not implemented")),
     } as i32;
-    let current_time = SystemTime::now();
-    let seconds_since_epoch = current_time
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    let seconds = seconds_since_epoch.as_secs() as i32;
 
-    Ok(period_length_s - (seconds % period_length_s))
+    Ok(period_length_s - (seconds_since_epoch % period_length_s))
 }
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::otp::{
         Entry, EntryInfo, EntryInfoHotp, EntryInfoSteam, EntryInfoTotp, HashAlgorithm,
     };
+
+    fn totp_entry() -> Entry {
+        Entry {
+            info: EntryInfo::Totp(EntryInfoTotp {
+                secret: "4SJHB4GSD43FZBAI7C2HLRJGPQ".to_string(),
+                algo: HashAlgorithm::Sha1,
+                digits: 6,
+                period: 30,
+            }),
+            name: "Mason".to_string(),
+            issuer: "Deno".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_totp_generate() {
+        let entry = totp_entry();
+        let otp_0 = generate_otp_impl(&entry.info, 0).unwrap();
+        let otp_10 = generate_otp_impl(&entry.info, 10).unwrap();
+        let otp_50 = generate_otp_impl(&entry.info, 50).unwrap();
+        assert_eq!(otp_0, "591295");
+        assert_eq!(otp_10, "591295");
+        assert_eq!(otp_50, "526156");
+    }
+
+    #[test]
+    fn test_totp_time_remaining() {
+        let entry = totp_entry();
+        let remaining_time = calculate_remaining_time_impl(&entry.info, 0).unwrap();
+        assert_eq!(remaining_time, 30);
+
+        let remaining_time = calculate_remaining_time_impl(&entry.info, 10).unwrap();
+        assert_eq!(remaining_time, 20);
+
+        let remaining_time = calculate_remaining_time_impl(&entry.info, 50).unwrap();
+        assert_eq!(remaining_time, 10);
+    }
 
     #[test]
     fn parse_hotp() {
