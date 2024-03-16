@@ -4,7 +4,7 @@ use console::{Style, Term};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
 use std::{env, fs, path::PathBuf, process::exit, time::Duration};
 
-use aegis_rs::{
+use aegis_vault_utils::{
     otp::{calculate_remaining_time, generate_otp, Entry, EntryInfo},
     vault::{parse_vault, PasswordGetter},
 };
