@@ -82,16 +82,16 @@ To unlock the Aegis vault Aegis-rs supports the following methods:
 
 - [x] Add password file feature
 - [x] Add countdown timer and refresh TOTP code after timeout
-- [x] Improve on error handling
-- [ ] Support different TOTP algorithms
-    - [x] TOTP
-    - [ ] HOTP
-    - [ ] Steam
-    - [ ] Yandex
-- [x] Support unencrypted vaults
 - [ ] Display digits in groups
 - [x] Add TOTP to clipboard
 - [x] Add CI
+
+## Project history
+
+This project has been divided into a binary (this repo) and a [vault
+utility](https://github.com/Granddave/aegis-vault-utils) crate so that other
+projects can utilize the parsing and OTP generation functionalities as well.
+
 
 # License
 
