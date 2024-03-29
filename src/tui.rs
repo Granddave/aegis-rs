@@ -1,76 +1,51 @@
-use crate::app::{App, AppResult};
-use crate::event::EventHandler;
-use crate::ui;
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
-use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
-use ratatui::backend::Backend;
+use color_eyre::Result;
+use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 use std::io;
-use std::panic;
 
-/// Representation of a terminal user interface.
-///
-/// It is responsible for setting up the terminal,
-/// initializing the interface and handling the draw events.
-#[derive(Debug)]
-pub struct Tui<B: Backend> {
-    /// Interface to the Terminal.
-    terminal: Terminal<B>,
-    /// Terminal event handler.
-    pub events: EventHandler,
-}
+use app::App;
+use event::{Event, EventHandler};
+use handler::handle_key_events;
+use terminal::Tui;
 
-impl<B: Backend> Tui<B> {
-    /// Constructs a new instance of [`Tui`].
-    pub fn new(terminal: Terminal<B>, events: EventHandler) -> Self {
-        Self { terminal, events }
+use crate::Config;
+
+use self::app::AppState;
+
+/// Application.
+pub mod app;
+
+/// Terminal events handler.
+pub mod event;
+
+/// Widget renderer.
+pub mod ui;
+
+/// Terminal user interface.
+pub mod terminal;
+
+/// Event handler.
+pub mod handler;
+
+pub async fn run(config: &Config) -> Result<()> {
+    let mut app = App::new(&config);
+
+    let backend = CrosstermBackend::new(io::stderr());
+    let terminal = Terminal::new(backend)?;
+    let events = EventHandler::new();
+    let mut tui = Tui::new(terminal, events);
+    tui.init()?;
+
+    while app.state != AppState::Quit {
+        tui.draw(&mut app)?;
+        match tui.events.next().await? {
+            Event::Tick(duration) => app.tick(duration)?,
+            Event::Key(key_event) => handle_key_events(key_event, &mut app)?,
+            Event::Mouse(_) => {}
+            Event::Resize(_, _) => {}
+        }
     }
 
-    /// Initializes the terminal interface.
-    ///
-    /// It enables the raw mode and sets terminal properties.
-    pub fn init(&mut self) -> AppResult<()> {
-        terminal::enable_raw_mode()?;
-        crossterm::execute!(io::stderr(), EnterAlternateScreen, EnableMouseCapture)?;
-
-        // Define a custom panic hook to reset the terminal properties.
-        // This way, you won't have your terminal messed up if an unexpected error happens.
-        let panic_hook = panic::take_hook();
-        panic::set_hook(Box::new(move |panic| {
-            Self::reset().expect("failed to reset the terminal");
-            panic_hook(panic);
-        }));
-
-        self.terminal.hide_cursor()?;
-        self.terminal.clear()?;
-        Ok(())
-    }
-
-    /// [`Draw`] the terminal interface by [`rendering`] the widgets.
-    ///
-    /// [`Draw`]: ratatui::Terminal::draw
-    /// [`rendering`]: crate::ui::render
-    pub fn draw(&mut self, app: &mut App) -> AppResult<()> {
-        self.terminal.draw(|frame| ui::render(app, frame))?;
-        Ok(())
-    }
-
-    /// Resets the terminal interface.
-    ///
-    /// This function is also used for the panic hook to revert
-    /// the terminal properties if unexpected errors occur.
-    fn reset() -> AppResult<()> {
-        terminal::disable_raw_mode()?;
-        crossterm::execute!(io::stderr(), LeaveAlternateScreen, DisableMouseCapture)?;
-        Ok(())
-    }
-
-    /// Exits the terminal interface.
-    ///
-    /// It disables the raw mode and reverts back the terminal properties.
-    pub fn exit(&mut self) -> AppResult<()> {
-        Self::reset()?;
-        self.terminal.show_cursor()?;
-        Ok(())
-    }
+    tui.exit()?;
+    Ok(())
 }

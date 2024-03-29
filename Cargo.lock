@@ -48,9 +48,7 @@ dependencies = [
 
 [[package]]
 name = "aegis-vault-utils"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "880e42d68914d6abbdcc3a0d29e81531197945173db8c5013552d4638d0ea618"
+version = "0.4.1"
 dependencies = [
  "aes-gcm",
  "base64 0.22.0",
