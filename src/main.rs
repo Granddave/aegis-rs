@@ -187,7 +187,7 @@ fn main() -> Result<()> {
             exit(1);
         }
     };
-    let entries = match parse_vault(&file_contents, args.password_input) {
+    let entries = match parse_vault(&file_contents, &args.password_input) {
         Ok(db) => db
             .entries
             .into_iter()
