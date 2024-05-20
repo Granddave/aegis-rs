@@ -1,7 +1,9 @@
 use clap::{crate_version, Args, Parser};
 use color_eyre::eyre::{eyre, Result};
-use console::{Style, Term};
+use console::{Key, Style, Term};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Password};
+use std::sync::mpsc::{self, TryRecvError};
+use std::thread;
 use std::{env, fs, path::PathBuf, process::exit, time::Duration};
 
 use aegis_vault_utils::{
@@ -105,11 +107,35 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
     let term = Term::stdout();
     term.hide_cursor()?;
 
+    let (tx, rx) = mpsc::channel();
+
+    // Spawn a thread to listen for key presses
+    thread::spawn(move || {
+        let term = Term::stdout();
+        loop {
+            if let Ok(key) = term.read_key() {
+                if key == Key::Escape {
+                    let _ = tx.send(());
+                    break;
+                }
+            }
+        }
+    });
+
     let mut clipboard = arboard::Clipboard::new().ok();
     let mut otp_code = String::new();
     let mut last_remaining_time = 0;
 
     loop {
+        match rx.try_recv() {
+            Ok(_) | Err(TryRecvError::Disconnected) => {
+                term.clear_last_lines(1)?;
+                term.show_cursor()?;
+                break;
+            }
+            Err(TryRecvError::Empty) => {}
+        }
+
         let remaining_time = calculate_remaining_time(entry_info)?;
         if last_remaining_time < remaining_time {
             otp_code = generate_otp(entry_info)?;
@@ -127,10 +153,12 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
             .bold()
             .apply_to(format!("{} ({}s left)", otp_code, remaining_time));
         term.write_line(line.to_string().as_str())?;
-        std::thread::sleep(Duration::from_secs(1));
+        std::thread::sleep(Duration::from_millis(60));
         term.clear_last_lines(1)?;
         last_remaining_time = remaining_time;
     }
+
+    Ok(())
 }
 
 fn entries_to_json(entries: &[Entry]) -> Result<()> {
@@ -159,20 +187,30 @@ fn fuzzy_select(entries: &[Entry]) -> Result<()> {
         .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
         .collect();
     set_sigint_hook();
-    let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
-        .items(&items)
-        .default(0)
-        .interact_opt()?;
-    match selection {
-        Some(index) => {
-            let entry_info = &entries.get(index).unwrap().info;
-            print_otp_every_second(entry_info)?;
-        }
-        None => {
-            println!("No selection");
+    loop {
+        let selection = match FuzzySelect::with_theme(&ColorfulTheme::default())
+            .items(&items)
+            .default(0)
+            .clear(true)
+            .interact_opt()
+        {
+            Ok(selection) => selection,
+            Err(_) => {
+                // Exit on e.g. Ctrl+C
+                exit(0);
+            }
+        };
+        match selection {
+            Some(index) => {
+                let entry_info = &entries.get(index).unwrap().info;
+                print_otp_every_second(entry_info)?;
+            }
+            None => {
+                // Exit on Escape key
+                exit(0);
+            }
         }
     }
-    Ok(())
 }
 
 fn main() -> Result<()> {
