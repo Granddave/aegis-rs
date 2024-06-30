@@ -1,0 +1,2 @@
+publish = false  # Let the release workflow in CI do the publishing
+allow-branch = ['master']
