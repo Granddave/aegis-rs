@@ -2,6 +2,14 @@
 
 This document describes the release process of Aegis-rs.
 
+The release process is designed to function as follows:
+
+1. Let cargo-release do checks, create tags locally and push version bump
+2. Let CI workflow build the release binaries and prepare a release draft
+3. Write release notes and press *publish*
+
+See below for detailed steps.
+
 ## Prerequisites
 
 Install [Cargo release](https://github.com/crate-ci/cargo-release):
