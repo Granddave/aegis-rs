@@ -32,4 +32,8 @@ cargo install cargo-release
 4. Wait for the CI to both build the binaries and to create a release draft on GitHub
 5. Fill out the release notes
 6. Publish the release on GitHub
+7. Update `latest` tag.
+    - `git tag latest -f <newest-tag>` - Updates tag locally
+    - `git push origin :latest` - Removes tag on origin
+    - `git push origin latest` - Pushes updated tag to origin
 
