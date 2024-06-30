@@ -3,6 +3,8 @@ name = "aegis-rs"
 version = "0.3.1"
 edition = "2021"
 license = "GPL-3.0-or-later"
+description = "Aegis compatible OTP generator for the CLI"
+repository = "https://github.com/granddave/aegis-rs/"
 
 [dependencies]
 aegis-vault-utils = "0.5.0"
