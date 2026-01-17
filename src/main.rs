@@ -26,6 +26,13 @@ struct Cli {
     entry_filter: EntryFilter,
     #[clap(long, help = "Print to stdout in JSON")]
     json: bool,
+    #[clap(
+        long,
+        help = "Group OTP digits",
+        env = "AEGIS_DIGIT_GROUP_SIZE",
+        default_value_t = 3
+    )]
+    digit_group_size: usize,
 }
 
 #[derive(Args)]
@@ -103,7 +110,7 @@ fn set_sigint_hook() {
     .expect("Setting SIGINT handler");
 }
 
-fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
+fn print_otp_every_second(entry_info: &EntryInfo, otp_group_size: usize) -> Result<()> {
     let term = Term::stdout();
     term.hide_cursor()?;
 
@@ -149,9 +156,11 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
             6..=15 => Style::new().yellow(),
             _ => Style::new().green(),
         };
-        let line = style
-            .bold()
-            .apply_to(format!("{} ({}s left)", otp_code, remaining_time));
+        let line = style.bold().apply_to(format!(
+            "{} ({}s left)",
+            group_otp_digits(&otp_code, otp_group_size),
+            remaining_time
+        ));
         term.write_line(line.to_string().as_str())?;
         std::thread::sleep(Duration::from_millis(60));
         term.clear_last_lines(1)?;
@@ -159,6 +168,17 @@ fn print_otp_every_second(entry_info: &EntryInfo) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn group_otp_digits(otp: &str, otp_group_size: usize) -> String {
+    let mut result = String::with_capacity(otp.len() + otp.len() / otp_group_size);
+    for (i, c) in otp.chars().enumerate() {
+        if i > 0 && i % otp_group_size == 0 {
+            result.push(' ');
+        }
+        result.push(c);
+    }
+    result
 }
 
 fn entries_to_json(entries: &[Entry]) -> Result<()> {
@@ -181,7 +201,7 @@ fn entries_to_json(entries: &[Entry]) -> Result<()> {
     Ok(())
 }
 
-fn fuzzy_select(entries: &[Entry]) -> Result<()> {
+fn fuzzy_select(entries: &[Entry], otp_group_size: usize) -> Result<()> {
     let items: Vec<String> = entries
         .iter()
         .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
@@ -203,7 +223,7 @@ fn fuzzy_select(entries: &[Entry]) -> Result<()> {
         match selection {
             Some(index) => {
                 let entry_info = &entries.get(index).unwrap().info;
-                print_otp_every_second(entry_info)?;
+                print_otp_every_second(entry_info, otp_group_size)?;
             }
             None => {
                 // Exit on Escape key
@@ -247,7 +267,7 @@ fn main() -> Result<()> {
     if args.json {
         entries_to_json(&entries)?;
     } else {
-        fuzzy_select(&entries)?;
+        fuzzy_select(&entries, args.digit_group_size)?;
     }
 
     Ok(())
