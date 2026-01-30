@@ -32,7 +32,7 @@ struct Cli {
         env = "AEGIS_DIGIT_GROUP_SIZE",
         default_value_t = 3
     )]
-    digit_group_size: usize,
+    digit_group_size: isize,
 }
 
 #[derive(Args)]
@@ -171,6 +171,9 @@ fn print_otp_every_second(entry_info: &EntryInfo, otp_group_size: usize) -> Resu
 }
 
 fn group_otp_digits(otp: &str, otp_group_size: usize) -> String {
+    if otp_group_size == 0 {
+        return otp.to_string();
+    }
     let mut result = String::with_capacity(otp.len() + otp.len() / otp_group_size);
     for (i, c) in otp.chars().enumerate() {
         if i > 0 && i % otp_group_size == 0 {
@@ -237,7 +240,16 @@ fn main() -> Result<()> {
     color_eyre::install()?;
 
     let args = Cli::parse();
-
+    let digit_group_size = usize::try_from(args.digit_group_size)
+        .ok()
+        .filter(|&v| v > 0)
+        .unwrap_or_else(|| {
+            eprint!(
+                "The OTP group size : {} is not strictly positive",
+                args.digit_group_size
+            );
+            exit(1);
+        });
     let file_contents = match fs::read_to_string(&args.vault_file) {
         Ok(contents) => contents,
         Err(e) => {
@@ -267,7 +279,7 @@ fn main() -> Result<()> {
     if args.json {
         entries_to_json(&entries)?;
     } else {
-        fuzzy_select(&entries, args.digit_group_size)?;
+        fuzzy_select(&entries, digit_group_size)?;
     }
 
     Ok(())
