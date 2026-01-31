@@ -56,7 +56,7 @@ Aegis-rs allows you to read the OTP directly in the terminal or paste it using t
 
 ```sh
 · Twitter (@johndoe)
-121921 (28s left)
+121 921 (28s left)
 ```
 
 
@@ -80,13 +80,13 @@ To unlock the Aegis vault Aegis-rs supports the following methods:
 - `--issuer <ISSUER>`: Filter entries by entry issuer.
 - `--name <NAME>`: Filter entries by entry name.
 - `--json`: Output the calculated OTPs as JSON.
-
+- `--digit-group-size <SIZE>`: Display the selected OTP in group of SIZE digit
 
 ## TODO
 
 - [x] Add password file feature
 - [x] Add countdown timer and refresh TOTP code after timeout
-- [ ] Display digits in groups
+- [x] Display digits in groups
 - [x] Add TOTP to clipboard
 - [x] Add CI
 
