@@ -38,6 +38,13 @@ $ aegis-rs ~/Documents/aegis-backup-20230512-193110.json
 ? Insert Aegis Password › ********
 ```
 
+### Unlocking the Vault
+
+Aegis-rs will prompt you to enter the password, type the password then enter to unlock the vault.
+
+> For other ways to unlock the vault, check the Usage section.
+
+
 ### Searching for an Entry
 
 Aegis-rs supports fuzzy finding for quickly locating entries. Type a part of the entry's name to filter the list. For instance:
@@ -59,28 +66,25 @@ Aegis-rs allows you to read the OTP directly in the terminal or paste it using t
 121 921 (28s left)
 ```
 
+## Usage
 
-### Ways to unlock the Vault
+The following table show all options and arguments available.
 
-To unlock the Aegis vault Aegis-rs supports the following methods:
-
-1. Password: The password can be passed as an argument or set as an environment variable.
-    - Environment variable: `AEGIS_PASSWORD`
-    - Argument: `--password <PASSWORD>`
-    - Example: `aegis-rs --password hunter2 vault.json`
-2. Password file: A file containing the password to unlock the vault.
-    - Environment variable: `AEGIS_PASSWORD_FILE`
-    - Argument: `--password-file <PASSWORD_FILE>`
-    - Example: `aegis-rs --password-file /path/to/password-file vault.json`
-3. Password prompt: If no password is provided, Aegis-rs will prompt you to enter the password.
-
+> You can check the options and arguments with `aegis-rs -h`.
 
 ### Extra flags
 
-- `--issuer <ISSUER>`: Filter entries by entry issuer.
-- `--name <NAME>`: Filter entries by entry name.
-- `--json`: Output the calculated OTPs as JSON.
-- `--digit-group-size <SIZE>`: Display the selected OTP in group of SIZE digit
+| Description | Option or Argument | Environment variable | Note |
+|---|---|---|---|
+| Path to the vault file | `<VAULT_FILE_PATH>` | `AEGIS_VAULT_FILE` | Mandatory argument (no option flag) |
+| Password to unlock vault | `--password <PASSWORD>` | `AEGIS_PASSWORD` | Exclusive with the `--password-file` option |
+| Path to the password file | `-p <PASSWORD_FILE>`, `--password-file <PASSWORD_FILE>` | `AEGIS_PASSWORD_FILE` | Exclusive with the `--password` option |
+| Group OTP digits | `--digit-group-size <SIZE>`| `AEGIS_DIGIT_GROUP_SIZE` | Only affects interactive display |
+| Filter by entry issuer | `--issuer` | | |
+| Filter by entry name | `--name` | | |
+| Print to stdout in JSON | `--json` | | |
+| Print help | `-h`, `--help` | | |
+| Print version | `-V`, `--version` | | |
 
 ## TODO
 
