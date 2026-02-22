@@ -245,7 +245,7 @@ fn main() -> Result<()> {
         .filter(|&v| v > 0)
         .unwrap_or_else(|| {
             eprint!(
-                "The OTP group size : {} is not strictly positive",
+                "The OTP group size '{}' is not strictly positive",
                 args.digit_group_size
             );
             exit(1);
