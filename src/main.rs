@@ -11,6 +11,9 @@ use aegis_vault_utils::{
     vault::{parse_vault, PasswordGetter},
 };
 
+mod terminal_state;
+use terminal_state::TerminalState;
+
 #[derive(Parser)]
 #[clap(
     name = "aegis-rs",
@@ -100,14 +103,6 @@ impl PasswordGetter for PasswordInput {
                 .map_err(|e| eyre!("Failed to get password: {}", e)),
         }
     }
-}
-
-fn set_sigint_hook() {
-    ctrlc::set_handler(move || {
-        Term::stdout().show_cursor().expect("Showing cursor");
-        exit(0);
-    })
-    .expect("Setting SIGINT handler");
 }
 
 fn print_otp_every_second(entry_info: &EntryInfo, otp_group_size: usize) -> Result<()> {
@@ -205,11 +200,22 @@ fn entries_to_json(entries: &[Entry]) -> Result<()> {
 }
 
 fn fuzzy_select(entries: &[Entry], otp_group_size: usize) -> Result<()> {
+    // Snapshot terminal flags before anything modifies them, and register
+    // a SIGTERM/SIGINT handler that restores them before exiting.
+    let saved_state = TerminalState::save()?;
+    ctrlc::set_handler(move || {
+        let _ = saved_state.restore();
+        let term = Term::stdout();
+        let _ = term.clear_line();
+        let _ = term.write_str("\r");
+        let _ = term.show_cursor();
+        exit(0);
+    })?;
+
     let items: Vec<String> = entries
         .iter()
         .map(|entry| format!("{} ({})", entry.issuer.trim(), entry.name.trim()))
         .collect();
-    set_sigint_hook();
     loop {
         let selection = match FuzzySelect::with_theme(&ColorfulTheme::default())
             .items(&items)
@@ -220,6 +226,7 @@ fn fuzzy_select(entries: &[Entry], otp_group_size: usize) -> Result<()> {
             Ok(selection) => selection,
             Err(_) => {
                 // Exit on e.g. Ctrl+C
+                let _ = Term::stdout().show_cursor();
                 exit(0);
             }
         };
