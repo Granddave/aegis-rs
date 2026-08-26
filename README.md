@@ -86,14 +86,6 @@ The following table show all options and arguments available.
 | Print help | `-h`, `--help` | | |
 | Print version | `-V`, `--version` | | |
 
-## TODO
-
-- [x] Add password file feature
-- [x] Add countdown timer and refresh TOTP code after timeout
-- [x] Display digits in groups
-- [x] Add TOTP to clipboard
-- [x] Add CI
-
 ## Project history
 
 This project has been divided into a binary (this repo) and a [vault
