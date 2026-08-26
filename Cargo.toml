@@ -1,19 +1,27 @@
 [package]
 name = "aegis-rs"
+authors = ["David Isaksson <davidisaksson93@gmail.com>"]
 version = "0.5.1"
 edition = "2021"
 license = "GPL-3.0-or-later"
-description = "Aegis compatible OTP generator for the CLI"
+description = "Library and CLI for decrypting Aegis vaults and generating OTP codes"
 repository = "https://github.com/granddave/aegis-rs/"
+keywords = ["otp", "encryption", "2fa", "aegis"]
+categories = ["authentication", "cryptography", "command-line-utilities"]
 
 [dependencies]
-aegis-vault-utils = "0.5.2"
+aes-gcm = "0.10"
 arboard = "3"
+base64 = "0.22"
 clap = { version = "4.6", features = ["derive", "cargo", "env"] }
 color-eyre = "0.6"
 console = "0.16"
 ctrlc = "3.5"
 dialoguer = { version = "0.12", features = ["fuzzy-select"] }
+hex = "0.4"
+libreauth = "0.18"
+password-hash = "0.5"
+scrypt = "0.11"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

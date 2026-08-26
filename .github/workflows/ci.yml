@@ -51,3 +51,5 @@ jobs:
         run: just lint
       - name: Check formatting
         run: just format
+      - name: Build docs
+        run: just docs

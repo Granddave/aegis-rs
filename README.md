@@ -4,7 +4,7 @@
 
 # Aegis 2FA Authenticator CLI
 
-This is a CLI tool for generating OTP codes from a backup vault from the Android app [Aegis Authenticator](https://github.com/beemdevelopment/Aegis).
+This project provides a Rust library and CLI for decrypting backup vaults from the Android app [Aegis Authenticator](https://github.com/beemdevelopment/Aegis) and generating OTP codes.
 
 
 ## Features
@@ -26,7 +26,7 @@ The easiest way to install Aegis-rs is by downloading a pre-compiled binary from
 You can also download and compile yourself by using cargo-install:
 
 ```sh
-$ cargo install --git https://github.com/Granddave/aegis-rs --tag latest
+cargo install aegis-rs
 ```
 
 ### Launching Aegis-rs with a Backup File
@@ -87,11 +87,46 @@ The following table show all options and arguments available.
 | Print version | `-V`, `--version` | | |
 
 
+## Library
+
+Add the crate to a Rust project:
+
+```sh
+cargo add aegis-rs color-eyre
+```
+
+The library exposes vault parsing and OTP generation:
+
+```rust,no_run
+use aegis_rs::{
+    otp::generate_otp,
+    vault::{parse_vault, PasswordGetter},
+};
+use color_eyre::eyre::Result;
+
+struct Password;
+
+impl PasswordGetter for Password {
+    fn get_password(&self) -> Result<String> {
+        Ok("password".to_string())
+    }
+}
+
+fn main() -> Result<()> {
+    let contents = std::fs::read_to_string("aegis-backup.json")?;
+    let database = parse_vault(&contents, &Password)?;
+    let otp = generate_otp(&database.entries[0].info)?;
+    println!("{otp}");
+    Ok(())
+}
+```
+
+
 ## Project history
 
-This project has been divided into a binary (this repo) and a [vault
-utility](https://github.com/Granddave/aegis-vault-utils) crate so that other
-projects can utilize the parsing and OTP generation functionalities as well.
+The library was previously published separately as
+[`aegis-vault-utils`](https://github.com/Granddave/aegis-vault-utils). Starting
+with version 0.6.0, the library and CLI are published together as `aegis-rs`.
 
 
 # License

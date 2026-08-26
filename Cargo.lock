@@ -31,28 +31,16 @@ dependencies = [
 name = "aegis-rs"
 version = "0.5.1"
 dependencies = [
- "aegis-vault-utils",
+ "aes-gcm",
  "arboard",
+ "base64",
  "clap",
  "color-eyre",
  "console",
  "ctrlc",
  "dialoguer",
- "libc",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "aegis-vault-utils"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fccf2bfb40029c32c69bb99ab3fecfd9588f514023438127306c5d986323f2f"
-dependencies = [
- "aes-gcm",
- "base64",
- "color-eyre",
  "hex",
+ "libc",
  "libreauth",
  "password-hash",
  "scrypt",

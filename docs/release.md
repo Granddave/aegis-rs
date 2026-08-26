@@ -5,8 +5,9 @@ This document describes the release process of Aegis-rs.
 The release process is designed to function as follows:
 
 1. Let cargo-release do checks, create tags locally and push version bump
-2. Let CI workflow build the release binaries and prepare a release draft
-3. Write release notes and press *publish*
+2. Let CI build the release binaries and prepare a release draft
+3. Write release notes and publish the GitHub release
+4. Let CI publish the combined library and application package to crates.io
 
 See below for detailed steps.
 
@@ -29,11 +30,11 @@ cargo install cargo-release
     - `cargo release patch -x`
     - `cargo release minor -x`
     - `cargo release major -x`
-4. Wait for the CI to both build the binaries and to create a release draft on GitHub
+4. Wait for CI to build the binaries and create a release draft on GitHub
 5. Fill out the release notes
-6. Publish the release on GitHub
-7. Update `latest` tag.
+6. Publish the release on GitHub, which publishes the package to crates.io
+7. Confirm that the crates.io publication workflow succeeds
+8. Update `latest` tag.
     - `git tag latest -f <newest-tag>` - Updates tag locally
     - `git push origin :latest` - Removes tag on origin
     - `git push origin latest` - Pushes updated tag to origin
-

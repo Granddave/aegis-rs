@@ -6,7 +6,7 @@ use std::sync::mpsc::{self, TryRecvError};
 use std::thread;
 use std::{env, fs, path::PathBuf, process::exit, time::Duration};
 
-use aegis_vault_utils::{
+use aegis_rs::{
     otp::{calculate_remaining_time, generate_otp, Entry, EntryInfo},
     vault::{parse_vault, PasswordGetter},
 };

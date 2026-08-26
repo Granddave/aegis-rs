@@ -1,0 +1,28 @@
+---
+name: Publish crate
+
+on:
+  release:
+    types:
+      - published
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  RUSTDOCFLAGS: -D warnings
+
+jobs:
+  crates-io:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Get build cache
+        uses: Swatinem/rust-cache@v2
+      - name: Publish
+        run: cargo publish --locked --token ${{ secrets.CARGO_API_KEY }}

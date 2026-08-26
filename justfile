@@ -1,13 +1,16 @@
-default: build test lint format
+default: build test lint format docs
 
 build:
-  cargo build
+  cargo build --all-targets
 
 test:
-  cargo test
+  cargo test --all-targets
 
 lint:
-  cargo clippy
+  cargo clippy --all-targets -- -D warnings
 
 format:
   cargo fmt --all -- --check
+
+docs:
+  cargo doc --no-deps --all-features
