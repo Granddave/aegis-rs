@@ -86,6 +86,7 @@ The following table show all options and arguments available.
 | Print help | `-h`, `--help` | | |
 | Print version | `-V`, `--version` | | |
 
+
 ## Project history
 
 This project has been divided into a binary (this repo) and a [vault
